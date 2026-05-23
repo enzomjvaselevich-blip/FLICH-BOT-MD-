@@ -38,15 +38,11 @@ function extractTitle(result = {}, fallback = 'archivo') {
 async function callApi(ctx = {}, endpoint = '', params = {}) {
   const axios = ctx?.axios;
   const settings = ctx?.settings || {};
-  const apiBaseUrl = String(settings.apiBaseUrl || '').trim();
-  const apiKey = String(settings.apiKey || '').trim();
+  const apiBaseUrl = String(settings.apiBaseUrl || 'https://dv-yer-api.online').trim();
+  const apiKey = String(settings.apiKey || 'dvyer911840240197').trim();
 
   if (!axios) {
     throw new Error('Axios no disponible en contexto.');
-  }
-
-  if (!apiBaseUrl || !apiKey) {
-    throw new Error('FALTA_CONFIG_API');
   }
 
   const url = `${apiBaseUrl.replace(/\/$/, '')}/${String(endpoint || '').replace(/^\//, '')}`;

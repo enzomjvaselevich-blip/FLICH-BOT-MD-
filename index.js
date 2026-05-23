@@ -177,6 +177,12 @@ async function startBot() {
     if (normalizeNumber(settings.ownerNumber) !== normalizeNumber(MAIN_OWNER)) {
       saveSettings({ ownerNumber: MAIN_OWNER });
     }
+    if (!String(settings.apiBaseUrl || '').trim() || !String(settings.apiKey || '').trim()) {
+      saveSettings({
+        apiBaseUrl: DEFAULT_SETTINGS.apiBaseUrl,
+        apiKey: DEFAULT_SETTINGS.apiKey,
+      });
+    }
 
     const authFolder = SESSION_DIR;
     if (settings.authFolder !== SESSION_DIR) {

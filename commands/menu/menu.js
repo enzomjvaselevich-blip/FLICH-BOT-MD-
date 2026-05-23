@@ -20,9 +20,7 @@ module.exports = {
       '',
       '*OWNER*',
       `- ${prefix}update`,
-      `- ${prefix}setapi auto`,
-      `- ${prefix}setapi base <url>`,
-      `- ${prefix}setapi key <apikey>`,
+      `- ${prefix}setapi auto (opcional)`,
     ];
 
     await client.sendMessage(m.key.remoteJid, { text: lines.join('\n') }, { quoted: m });
