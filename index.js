@@ -9,6 +9,7 @@ let useMultiFileAuthState;
 let fetchLatestBaileysVersion;
 let DisconnectReason;
 
+let loadError = null;
 try {
   ({
     default: makeWASocket,
@@ -16,7 +17,8 @@ try {
     fetchLatestBaileysVersion,
     DisconnectReason,
   } = require('fsociety-Baileys'));
-} catch {
+} catch (err1) {
+  loadError = err1;
   try {
     ({
       default: makeWASocket,
@@ -24,8 +26,12 @@ try {
       fetchLatestBaileysVersion,
       DisconnectReason,
     } = require('baileys-fsociety'));
-  } catch {
+  } catch (err2) {
+    loadError = err2 || loadError;
     console.log('No pude cargar tu Baileys personalizado.');
+    if (loadError?.message) {
+      console.log(`Detalle: ${loadError.message}`);
+    }
     console.log('Ejecuta: npm install');
     console.log('Si sigue igual, ejecuta: rm -rf node_modules package-lock.json && npm install');
     process.exit(1);
