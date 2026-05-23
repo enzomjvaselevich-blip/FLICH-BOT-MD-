@@ -1,4 +1,4 @@
-const { callApi, extractMediaUrl, extractTitle } = require('./_api');
+const { extractMediaUrl, extractTitle } = require('./_api');
 
 module.exports = {
   command: ['play', 'ytmp3', 'musica'],
@@ -15,7 +15,16 @@ module.exports = {
     await client.sendMessage(from, { text: 'Buscando audio de YouTube...' }, { quoted: m });
 
     try {
-      const result = await callApi(ctx, 'ytmp3', { q: query });
+      const axios = ctx?.axios;
+      const apiUrl = 'https://dv-yer-api.online/mp3';
+      const apiKey = 'dvyer911840240197';
+      if (!axios) throw new Error('Axios no disponible en contexto.');
+
+      const response = await axios.get(apiUrl, {
+        params: { q: query, apikey: apiKey },
+        timeout: 60000,
+      });
+      const result = response?.data?.result || response?.data?.data || response?.data || {};
       const mediaUrl = extractMediaUrl(result);
       const title = extractTitle(result, query);
 
@@ -30,15 +39,7 @@ module.exports = {
         fileName: `${title}.mp3`,
       }, { quoted: m });
     } catch (error) {
-      const msg = String(error?.message || error);
-      if (msg === 'FALTA_CONFIG_API') {
-        await client.sendMessage(from, {
-          text: 'Falta configurar API. Usa .setapi base <url> y .setapi key <apikey>',
-        }, { quoted: m });
-        return;
-      }
-
-      await client.sendMessage(from, { text: `Error en .play: ${msg}` }, { quoted: m });
+      await client.sendMessage(from, { text: `Error en .play: ${String(error?.message || error)}` }, { quoted: m });
     }
   },
 };
