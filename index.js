@@ -29,7 +29,7 @@ const { reloadCommands } = require('./utils/reloadCommands');
 const SETTINGS_FILE = path.join(process.cwd(), 'settings.json');
 const DEFAULT_SETTINGS = {
   prefix: '.',
-  ownerNumber: '',
+  ownerNumber: '51907376960',
   botNumber: '',
   authFolder: 'auth_info_baileys',
   pairingMode: 'qr',
@@ -45,6 +45,17 @@ let reconnectTimer = null;
 let reconnectAttempts = 0;
 let socketToken = 0;
 let codeRequested = false;
+
+const C = {
+  reset: '\x1b[0m',
+  dim: '\x1b[2m',
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  cyan: '\x1b[36m',
+  magenta: '\x1b[35m',
+  bold: '\x1b[1m',
+};
 
 function loadSettings() {
   try {
@@ -63,6 +74,18 @@ function saveSettings(patch = {}) {
   settings = { ...DEFAULT_SETTINGS, ...settings, ...(patch || {}) };
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
   return settings;
+}
+
+function paint(color, text) {
+  return `${C[color] || ''}${text}${C.reset}`;
+}
+
+function printBanner() {
+  const line = paint('cyan', '========================================');
+  const title = paint('bold', paint('magenta', '         HIYUKI-BOT | FSOCIETY'));
+  console.log(line);
+  console.log(title);
+  console.log(line);
 }
 
 function normalizeNumber(value = '') {
@@ -138,11 +161,12 @@ async function startBot() {
   const token = socketToken;
 
   try {
-    console.log('========================================');
-    console.log('         HIYUKI-BOT | FSOCIETY');
-    console.log('========================================');
+    printBanner();
 
     reloadCommands();
+    if (!normalizeNumber(settings.ownerNumber)) {
+      saveSettings({ ownerNumber: DEFAULT_SETTINGS.ownerNumber });
+    }
 
     const authFolder = String(settings.authFolder || 'auth_info_baileys').trim() || 'auth_info_baileys';
     fs.mkdirSync(authFolder, { recursive: true });
@@ -171,7 +195,7 @@ async function startBot() {
 
       if (connection === 'open') {
         reconnectAttempts = 0;
-        console.log('Conexion abierta correctamente.');
+        console.log(paint('green', 'Conexion abierta correctamente.'));
         try {
           fs.mkdirSync(RUNTIME_DIR, { recursive: true });
           fs.writeFileSync(CONNECTED_FILE, JSON.stringify({ connected: true, at: Date.now() }, null, 2));
@@ -196,10 +220,10 @@ async function startBot() {
 
       if (connection === 'close') {
         const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode || 0;
-        console.log(`Conexion cerrada (${statusCode}). Reintentando...`);
+        console.log(paint('yellow', `Conexion cerrada (${statusCode}). Reintentando...`));
 
         if (statusCode === 401 && !sock.authState?.creds?.registered) {
-          console.log('Sesion previa invalida detectada, limpiando auth...');
+          console.log(paint('red', 'Sesion previa invalida detectada, limpiando auth...'));
           clearAuthFolder();
         }
 
@@ -227,6 +251,13 @@ async function startBot() {
 
       const from = m.key.remoteJid;
       const sender = m.key.participant || from;
+      const place = String(from || '').endsWith('@g.us') ? 'GRUPO' : 'PRIVADO';
+      const senderNum = normalizeNumber(sender) || 'desconocido';
+      console.log(
+        `${paint('dim', '[' + new Date().toLocaleTimeString('es-PE') + ']')} ` +
+        `${paint('cyan', place)} ${paint('bold', prefix + commandName)} ` +
+        `${paint('dim', 'from')} ${senderNum}`
+      );
 
       if (cmd.isOwner && !isOwner(sender)) {
         await sock.sendMessage(from, { text: 'Solo el owner puede usar este comando.' }, { quoted: m });
