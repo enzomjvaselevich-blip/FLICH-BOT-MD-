@@ -95,6 +95,7 @@ let promptRunning = false;
 let reconnectTimer = null;
 let reconnectAttempts = 0;
 let activeSocket = null;
+let pairingInProgress = false;
 
 async function getPairingTargetNumber() {
   const savedNumber = normalizeNumber(settings.botNumber || '');
@@ -146,6 +147,80 @@ function scheduleReconnect() {
   }, waitMs);
 }
 
+function clearAuthFolder(targetFolder = '') {
+  const folder = String(targetFolder || '').trim();
+  if (!folder) return;
+  try {
+    fs.rmSync(folder, { recursive: true, force: true });
+  } catch {}
+  try {
+    fs.mkdirSync(folder, { recursive: true });
+  } catch {}
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function waitForConnectionOpen(sock, timeoutMs = 25000) {
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      reject(new Error('Timeout esperando conexion abierta.'));
+    }, Math.max(5000, Number(timeoutMs || 25000)));
+
+    const onUpdate = ({ connection, lastDisconnect }) => {
+      if (done) return;
+      if (connection === 'open') {
+        done = true;
+        clearTimeout(timer);
+        sock.ev.off('connection.update', onUpdate);
+        resolve(true);
+        return;
+      }
+
+      if (connection === 'close') {
+        const code = new Boom(lastDisconnect?.error)?.output?.statusCode || 0;
+        done = true;
+        clearTimeout(timer);
+        sock.ev.off('connection.update', onUpdate);
+        reject(new Error(`Conexion cerrada mientras esperaba open (${code})`));
+      }
+    };
+
+    sock.ev.on('connection.update', onUpdate);
+  });
+}
+
+async function requestPairingCodeWithRetry(sock, number, maxAttempts = 3) {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await waitForConnectionOpen(sock, 30000);
+      const code = await sock.requestPairingCode(number);
+      return code;
+    } catch (error) {
+      lastError = error;
+      const statusCode = Number(error?.output?.statusCode || error?.data?.statusCode || 0);
+      const canRetry =
+        statusCode === 428 ||
+        /Connection Closed|Precondition Required|closed/i.test(String(error?.message || ''));
+
+      if (!canRetry || attempt >= maxAttempts) {
+        break;
+      }
+
+      console.log(`Pairing intento ${attempt} fallo (${statusCode || 'sin-codigo'}). Reintentando...`);
+      await delay(1800 * attempt);
+    }
+  }
+
+  throw lastError || new Error('No pude obtener codigo de vinculacion.');
+}
+
 async function startBot() {
   console.log(buildBanner());
   reloadCommands();
@@ -157,7 +232,7 @@ async function startBot() {
 
   const sock = makeWASocket({
     version,
-    printQRInTerminal: false,
+    printQRInTerminal: true,
     logger: pino({ level: 'silent' }),
     auth: state,
     browser: ['HIYUKI BOT', 'Chrome', '1.0.0'],
@@ -175,6 +250,10 @@ async function startBot() {
 
     if (connection === 'close') {
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
+      if (statusCode === 401 && !sock.authState?.creds?.registered) {
+        console.log('Detecte 401 antes de vincular. Limpio auth y reintento automaticamente...');
+        clearAuthFolder(authFolder);
+      }
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
       if (shouldReconnect) scheduleReconnect();
       return;
@@ -182,10 +261,21 @@ async function startBot() {
   });
 
   if (!sock.authState.creds.registered) {
-    const number = await getPairingTargetNumber();
-    const code = await sock.requestPairingCode(number);
-    console.log(`Codigo de vinculacion: ${code}`);
-    console.log('WhatsApp > Dispositivos vinculados > Vincular con numero');
+    if (!pairingInProgress) {
+      pairingInProgress = true;
+      try {
+        const number = await getPairingTargetNumber();
+        const code = await requestPairingCodeWithRetry(sock, number, 3);
+        console.log(`Codigo de vinculacion: ${code}`);
+        console.log('WhatsApp > Dispositivos vinculados > Vincular con numero');
+      } catch (error) {
+        console.log('No pude generar codigo por numero en este intento.');
+        console.log(`Detalle: ${String(error?.message || error)}`);
+        console.log('Fallback activo: escanea el QR en consola para vincular.');
+      } finally {
+        pairingInProgress = false;
+      }
+    }
   }
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
