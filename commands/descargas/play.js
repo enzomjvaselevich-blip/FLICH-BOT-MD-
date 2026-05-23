@@ -46,17 +46,28 @@ module.exports = {
         return;
       }
 
-      const rows = top.map((item, i) => ({
+      const rowsMp3 = top.map((item, i) => ({
         header: '🎵',
         title: `${i + 1}. ${shortText(item?.title || 'Sin titulo')}`,
         description: `${shortText(item?.channel || 'Canal desconocido', 28)} | ${item?.duration_seconds || 0}s`,
         id: `${prefix}ytmp3 ${item.url}`,
       }));
+      const rowsMp4 = top.map((item, i) => ({
+        header: '🎬',
+        title: `${i + 1}. ${shortText(item?.title || 'Sin titulo')}`,
+        description: `${shortText(item?.channel || 'Canal desconocido', 28)} | ${item?.duration_seconds || 0}s`,
+        id: `${prefix}ytmp4 ${item.url}`,
+      }));
       const sections = [
         {
           title: '🎧 RESULTADOS YTMP3',
           highlight_label: 'TOP',
-          rows,
+          rows: rowsMp3,
+        },
+        {
+          title: '🎥 RESULTADOS YTMP4',
+          highlight_label: 'VIDEO',
+          rows: rowsMp4,
         },
       ];
 
@@ -95,17 +106,15 @@ Se descarga MP3 directo sin escribir mas.`;
       try {
         await client.sendMessage(from, payload, { quoted: m });
       } catch {
-        const fallbackRows = rows.map((r) => ({
-          title: r.title,
-          description: r.description,
-          rowId: r.id,
-        }));
         await client.sendMessage(from, {
-          text: `Resultados para: ${query}\nToca una opcion para descargar MP3 directo.`,
+          text: `Resultados para: ${query}\nToca una opcion para descargar MP3 o MP4.`,
           footer: 'HIYUKI-BOT',
           title: 'Selector de canciones',
           buttonText: 'Elegir cancion',
-          sections: [{ title: 'Descargar MP3', rows: fallbackRows }],
+          sections: [
+            { title: 'Descargar MP3', rows: rowsMp3.map((r) => ({ title: r.title, description: r.description, rowId: r.id })) },
+            { title: 'Descargar MP4', rows: rowsMp4.map((r) => ({ title: r.title, description: r.description, rowId: r.id })) },
+          ],
         }, { quoted: m });
       }
     } catch (error) {
