@@ -1,4 +1,7 @@
 const { extractMediaUrl, extractTitle } = require('./_api');
+function isYouTubeUrl(text = '') {
+  return /(?:youtu\.be\/|youtube\.com\/)/i.test(String(text || ''));
+}
 
 module.exports = {
   command: ['ytmp4', 'play2', 'video'],
@@ -15,12 +18,26 @@ module.exports = {
 
     try {
       const axios = ctx?.axios;
-      const apiUrl = 'https://dv-yer-api.online/mp4';
+      const apiBase = 'https://dv-yer-api.online';
       const apiKey = 'dvyer911840240197';
       if (!axios) throw new Error('Axios no disponible en contexto.');
 
-      const response = await axios.get(apiUrl, {
-        params: { q: query, apikey: apiKey },
+      let targetUrl = query;
+      if (!isYouTubeUrl(query)) {
+        const search = await axios.get(`${apiBase}/ytsearch`, {
+          params: { q: query, limit: 1, apikey: apiKey },
+          timeout: 60000,
+        });
+        const first = search?.data?.results?.[0];
+        targetUrl = first?.url || '';
+      }
+      if (!targetUrl) {
+        await client.sendMessage(from, { text: 'No encontre resultados en YouTube.' }, { quoted: m });
+        return;
+      }
+
+      const response = await axios.get(`${apiBase}/ytmp4`, {
+        params: { url: targetUrl, apikey: apiKey },
         timeout: 60000,
       });
       const result = response?.data?.result || response?.data?.data || response?.data || {};
