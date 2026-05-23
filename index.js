@@ -27,11 +27,12 @@ try {
 const { reloadCommands } = require('./utils/reloadCommands');
 
 const SETTINGS_FILE = path.join(process.cwd(), 'settings.json');
+const SESSION_DIR = path.join(process.cwd(), 'session', 'Hiyuki-bot');
 const DEFAULT_SETTINGS = {
   prefix: '.',
   ownerNumber: '51907376960',
   botNumber: '',
-  authFolder: 'auth_info_baileys',
+  authFolder: SESSION_DIR,
   pairingMode: 'qr',
   apiBaseUrl: 'https://dv-yer-api.online',
   apiKey: 'dvyer911840240197',
@@ -113,7 +114,7 @@ function ask(question) {
 }
 
 function clearAuthFolder() {
-  const folder = String(settings.authFolder || 'auth_info_baileys').trim();
+  const folder = SESSION_DIR;
   if (!folder) return;
   try { fs.rmSync(folder, { recursive: true, force: true }); } catch {}
   try { fs.mkdirSync(folder, { recursive: true }); } catch {}
@@ -168,7 +169,10 @@ async function startBot() {
       saveSettings({ ownerNumber: DEFAULT_SETTINGS.ownerNumber });
     }
 
-    const authFolder = String(settings.authFolder || 'auth_info_baileys').trim() || 'auth_info_baileys';
+    const authFolder = SESSION_DIR;
+    if (settings.authFolder !== SESSION_DIR) {
+      saveSettings({ authFolder: SESSION_DIR });
+    }
     fs.mkdirSync(authFolder, { recursive: true });
 
     const { state, saveCreds } = await useMultiFileAuthState(authFolder);
