@@ -109,7 +109,31 @@ function isOwner(jid = '') {
 
 function getMessageText(msg = {}) {
   const m = msg.message || {};
-  return m.conversation || m.extendedTextMessage?.text || '';
+  const fromText =
+    m.conversation ||
+    m.extendedTextMessage?.text ||
+    m.imageMessage?.caption ||
+    m.videoMessage?.caption ||
+    '';
+  if (fromText) return fromText;
+
+  const selectedId =
+    m.buttonsResponseMessage?.selectedButtonId ||
+    m.listResponseMessage?.singleSelectReply?.selectedRowId ||
+    m.templateButtonReplyMessage?.selectedId ||
+    '';
+  if (selectedId) return selectedId;
+
+  const paramsJson = m.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson;
+  if (paramsJson) {
+    try {
+      const parsed = JSON.parse(paramsJson);
+      return parsed?.id || parsed?.selectedId || '';
+    } catch {
+      return '';
+    }
+  }
+  return '';
 }
 
 function ask(question) {

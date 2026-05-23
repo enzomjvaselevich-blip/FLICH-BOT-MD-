@@ -23,7 +23,7 @@ module.exports = {
       '└──────────────',
       '',
       '┌─ 〘 DESCARGAS 〙',
-      `│ ${prefix}play <nombre> (buscar y elegir)`,
+      `│ ${prefix}play <nombre> (selector con boton)`,
       `│ ${prefix}play mp3 <numero>`,
       `│ ${prefix}play mp4 <numero>`,
       `│ ${prefix}ytmp3 <nombre/link>`,
