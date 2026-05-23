@@ -38,7 +38,9 @@ module.exports = {
     }
 
     await react(client, m, '⏳');
-    await client.sendMessage(from, { text: 'Buscando canciones en YouTube...' }, { quoted: m });
+    await client.sendMessage(from, {
+      text: '╭─❍ *HIYUKI PLAY* ❍─╮\n_🔎 Buscando en YouTube..._\n╰──────────────╯',
+    }, { quoted: m });
 
     try {
       const search = await axios.get(`${API_BASE}/ytsearch`, {
@@ -85,15 +87,15 @@ module.exports = {
 
       const landingText =
 `╔══════════════════════════╗
-║      HIYUKI PLAY HUB     ║
+║    *HIYUKI PLAY HUB*     ║
 ╚══════════════════════════╝
 
 🔎 Busqueda: *${query}*
-🎛️ Modo: *Selector interactivo*
+🎛️ Modo: _Selector interactivo_
 
 Pulsa *ELEGIR CANCION* y selecciona:
-• 🎧 MP3 para audio
-• 🎥 MP4 para video`;
+• 🎧 *MP3* para audio
+• 🎥 *MP4* para video`;
 
       const payload = {
         footer: 'HIYUKI-BOT',

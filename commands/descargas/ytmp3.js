@@ -53,10 +53,10 @@ module.exports = {
     await client.sendMessage(from, {
       text:
 `╔══════════════════════╗
-║   HIYUKI MP3 ENGINE  ║
+║  *HIYUKI MP3 ENGINE* ║
 ╚══════════════════════╝
-🔎 Buscando audio...
-⏳ Preparando descarga MP3`,
+_🔎 Buscando audio..._
+⏳ *Preparando descarga MP3*`,
     }, { quoted: m });
 
     try {

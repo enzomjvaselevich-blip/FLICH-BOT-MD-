@@ -23,10 +23,10 @@ module.exports = {
     await client.sendMessage(from, {
       text:
 `╔══════════════════════╗
-║   HIYUKI MP4 ENGINE  ║
+║  *HIYUKI MP4 ENGINE* ║
 ╚══════════════════════╝
-🔎 Buscando video...
-⏳ Preparando descarga MP4`,
+_🔎 Buscando video..._
+⏳ *Preparando descarga MP4*`,
     }, { quoted: m });
 
     try {
@@ -64,7 +64,7 @@ module.exports = {
 
       await client.sendMessage(from, {
         video: { url: mediaUrl },
-        caption: `✅ MP4 enviado correctamente\n🎬 ${title}`,
+        caption: `✅ *MP4 enviado correctamente*\n🎬 _${title}_`,
       }, { quoted: m });
       await react(client, m, '✅');
     } catch (error) {
