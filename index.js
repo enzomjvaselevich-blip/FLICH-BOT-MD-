@@ -14,9 +14,9 @@ try {
     useMultiFileAuthState,
     fetchLatestBaileysVersion,
     DisconnectReason,
-  } = require('@whiskeysockets/baileys'));
+  } = require('baileys-fsociety'));
 } catch {
-  console.log('Instala Baileys para ejecutar el bot: npm i @whiskeysockets/baileys');
+  console.log('Instala Baileys para ejecutar el bot: npm i');
   process.exit(0);
 }
 
