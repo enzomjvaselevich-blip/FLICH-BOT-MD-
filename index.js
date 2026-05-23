@@ -18,7 +18,7 @@ try {
     DisconnectReason,
   } = require('fsociety-Baileys'));
 } catch (err) {
-  console.log('No pude cargar tu Baileys personalizado.');
+  console.log('No pude cargar fsociety-Baileys.');
   console.log(`Detalle: ${String(err?.message || err)}`);
   console.log('Ejecuta: npm install');
   process.exit(1);
@@ -37,16 +37,12 @@ const DEFAULT_SETTINGS = {
   apiKey: '',
 };
 
-const RUNTIME_DIR = path.join(process.cwd(), 'runtime');
-const CONNECTED_STATE_FILE = path.join(RUNTIME_DIR, 'last-connected.json');
-
 let settings = loadSettings();
-let startupRunning = false;
-let bannerPrinted = false;
+let booting = false;
 let reconnectTimer = null;
 let reconnectAttempts = 0;
-let pairPromptInProgress = false;
-let sessionToken = 0;
+let socketToken = 0;
+let codeRequested = false;
 
 function loadSettings() {
   try {
@@ -54,7 +50,6 @@ function loadSettings() {
       fs.writeFileSync(SETTINGS_FILE, JSON.stringify(DEFAULT_SETTINGS, null, 2));
       return { ...DEFAULT_SETTINGS };
     }
-
     const parsed = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
     return { ...DEFAULT_SETTINGS, ...(parsed || {}) };
   } catch {
@@ -62,27 +57,19 @@ function loadSettings() {
   }
 }
 
-function saveSettings(nextSettings = {}) {
-  const safe = { ...DEFAULT_SETTINGS, ...(nextSettings || {}) };
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(safe, null, 2));
-  return safe;
-}
-
-function ensureDir(dirPath) {
-  try {
-    fs.mkdirSync(dirPath, { recursive: true });
-  } catch {}
-}
-
-function writeConnectedState(payload = {}) {
-  ensureDir(RUNTIME_DIR);
-  try {
-    fs.writeFileSync(CONNECTED_STATE_FILE, JSON.stringify(payload, null, 2));
-  } catch {}
+function saveSettings(patch = {}) {
+  settings = { ...DEFAULT_SETTINGS, ...settings, ...(patch || {}) };
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+  return settings;
 }
 
 function normalizeNumber(value = '') {
   return String(value || '').split('@')[0].split(':')[0].replace(/\D/g, '');
+}
+
+function isOwner(jid = '') {
+  const sender = normalizeNumber(jid);
+  return sender && (sender === normalizeNumber(settings.ownerNumber) || sender === normalizeNumber(settings.botNumber));
 }
 
 function getMessageText(msg = {}) {
@@ -90,255 +77,156 @@ function getMessageText(msg = {}) {
   return m.conversation || m.extendedTextMessage?.text || '';
 }
 
-function askQuestion(question) {
+function ask(question) {
   return new Promise((resolve) => {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    rl.question(question, (answer) => {
+    rl.question(question, (ans) => {
       rl.close();
-      resolve(answer);
+      resolve(String(ans || '').trim());
     });
   });
 }
 
-function buildBanner() {
-  return [
-    '========================================',
-    '         HIYUKI-BOT | FSOCIETY',
-    '========================================',
-  ].join('\n');
-}
-
-function clearAuthFolder(targetFolder = '') {
-  const folder = String(targetFolder || '').trim();
+function clearAuthFolder() {
+  const folder = String(settings.authFolder || 'auth_info_baileys').trim();
   if (!folder) return;
-  try {
-    fs.rmSync(folder, { recursive: true, force: true });
-  } catch {}
-  try {
-    fs.mkdirSync(folder, { recursive: true });
-  } catch {}
+  try { fs.rmSync(folder, { recursive: true, force: true }); } catch {}
+  try { fs.mkdirSync(folder, { recursive: true }); } catch {}
 }
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function isOwner(jid = '') {
-  const sender = normalizeNumber(jid);
-  if (!sender) return false;
-  const owner = normalizeNumber(settings.ownerNumber || '');
-  const bot = normalizeNumber(settings.botNumber || '');
-  return sender === owner || sender === bot;
-}
+async function ensurePairingConfig() {
+  const modeRaw = String(settings.pairingMode || 'codigo').toLowerCase();
+  const mode = modeRaw === 'qr' ? 'qr' : 'codigo';
+  saveSettings({ pairingMode: mode });
 
-async function getPairingMode() {
-  const saved = String(settings.pairingMode || 'codigo').toLowerCase();
-
-  if (pairPromptInProgress) return saved === 'qr' ? 'qr' : 'codigo';
-
-  pairPromptInProgress = true;
-  try {
-    const input = await askQuestion(
-      `Modo de vinculacion [codigo/qr] (actual ${saved}, Enter para usarlo): `
+  if (mode === 'codigo') {
+    const saved = normalizeNumber(settings.botNumber || '');
+    const answer = await ask(
+      saved
+        ? `Numero para vincular (actual ${saved}, Enter para usarlo): `
+        : 'Numero para vincular (ej: 51912345678): '
     );
-    const normalized = String(input || '').trim().toLowerCase();
-    const mode = normalized || saved;
-    const finalMode = mode === 'qr' ? 'qr' : 'codigo';
-
-    settings = saveSettings({
-      ...settings,
-      pairingMode: finalMode,
-    });
-
-    return finalMode;
-  } finally {
-    pairPromptInProgress = false;
+    const number = normalizeNumber(answer) || saved;
+    if (!number) throw new Error('Numero invalido para vinculacion por codigo.');
+    saveSettings({ botNumber: number, ownerNumber: normalizeNumber(settings.ownerNumber || '') || number });
+    console.log(`Numero objetivo: ${number}`);
+  } else {
+    console.log('Modo QR activo. Escanea el QR de la consola.');
   }
-}
-
-async function getPairingTargetNumber() {
-  const savedNumber = normalizeNumber(settings.botNumber || '');
-
-  if (pairPromptInProgress) {
-    return savedNumber;
-  }
-
-  pairPromptInProgress = true;
-  try {
-    const promptLabel = savedNumber
-      ? `Numero para vincular (actual ${savedNumber}, Enter para usarlo): `
-      : 'Numero para vincular (ej: 51912345678): ';
-
-    const input = await askQuestion(promptLabel);
-    const parsed = String(input || '').replace(/\D/g, '') || savedNumber;
-    if (!parsed) throw new Error('Numero invalido.');
-
-    settings = saveSettings({
-      ...settings,
-      botNumber: parsed,
-      ownerNumber: normalizeNumber(settings.ownerNumber || '') || parsed,
-    });
-
-    return parsed;
-  } finally {
-    pairPromptInProgress = false;
-  }
-}
-
-async function requestPairingCodeWithRetry(sock, number, maxAttempts = 8) {
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      await delay(1000 * attempt);
-      const code = await sock.requestPairingCode(number);
-      return code;
-    } catch (error) {
-      lastError = error;
-      const statusCode = Number(error?.output?.statusCode || error?.data?.statusCode || 0);
-      const canRetry =
-        statusCode === 428 ||
-        statusCode === 401 ||
-        statusCode === 408 ||
-        /Connection Closed|Precondition Required|closed/i.test(String(error?.message || ''));
-
-      if (!canRetry || attempt >= maxAttempts) break;
-
-      console.log(`Pairing intento ${attempt} fallo (${statusCode || 'sin-codigo'}). Reintentando...`);
-      await delay(1500 * attempt);
-    }
-  }
-
-  throw lastError || new Error('No pude obtener codigo de vinculacion.');
 }
 
 function scheduleReconnect() {
   if (reconnectTimer) return;
-
   reconnectAttempts += 1;
   const waitMs = Math.min(15000, 2000 + reconnectAttempts * 1200);
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
-    startBot().catch((err) => console.error('Error reiniciando bot:', err));
+    startBot().catch((err) => console.error('Error al reconectar:', err));
   }, waitMs);
 }
 
+async function requestCodeWithRetry(sock, number) {
+  for (let i = 1; i <= 8; i += 1) {
+    try {
+      await delay(900 * i);
+      return await sock.requestPairingCode(number);
+    } catch (e) {
+      const code = Number(e?.output?.statusCode || 0);
+      const retryable = code === 428 || code === 408 || code === 401;
+      if (!retryable || i === 8) throw e;
+      console.log(`Reintento codigo ${i} (${code || 'sin-codigo'})...`);
+      await delay(1200 * i);
+    }
+  }
+  throw new Error('No pude obtener codigo.');
+}
+
 async function startBot() {
-  if (startupRunning) return;
-  startupRunning = true;
-  sessionToken += 1;
-  const localToken = sessionToken;
+  if (booting) return;
+  booting = true;
+  socketToken += 1;
+  const token = socketToken;
 
   try {
-    if (!bannerPrinted) {
-      bannerPrinted = true;
-      console.log(buildBanner());
-    }
+    console.log('========================================');
+    console.log('         HIYUKI-BOT | FSOCIETY');
+    console.log('========================================');
 
     reloadCommands();
 
     const authFolder = String(settings.authFolder || 'auth_info_baileys').trim() || 'auth_info_baileys';
-    const prefix = String(settings.prefix || '.').trim() || '.';
-    ensureDir(authFolder);
+    fs.mkdirSync(authFolder, { recursive: true });
 
     const { state, saveCreds } = await useMultiFileAuthState(authFolder);
-    const { version } = await fetchLatestBaileysVersion();
-
-    let pairingMode = String(settings.pairingMode || 'codigo').toLowerCase();
-    let pairingNumber = '';
-
     if (!state?.creds?.registered) {
-      pairingMode = await getPairingMode();
-      console.log(`Modo de vinculacion activo: ${pairingMode.toUpperCase()}`);
-
-      if (pairingMode === 'codigo') {
-        pairingNumber = await getPairingTargetNumber();
-        console.log(`Numero objetivo para vinculacion: ${pairingNumber}`);
-      } else {
-        console.log('Escanea el QR dentro de los proximos 30 segundos.');
-      }
+      await ensurePairingConfig();
+      codeRequested = false;
     }
+
+    const { version } = await fetchLatestBaileysVersion();
+    const isQrMode = String(settings.pairingMode || 'codigo').toLowerCase() === 'qr';
 
     const sock = makeWASocket({
       version,
-      printQRInTerminal: !state?.creds?.registered && pairingMode === 'qr',
+      printQRInTerminal: !state?.creds?.registered && isQrMode,
       logger: pino({ level: 'silent' }),
       auth: state,
-      browser: ['HIYUKI BOT', 'Chrome', '1.0.0'],
+      browser: ['HIYUKI-BOT', 'Chrome', '1.0.0'],
     });
 
     sock.ev.on('creds.update', saveCreds);
 
-    let codeDelivered = false;
-    let codeRequestRunning = false;
-
     sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
-      if (localToken !== sessionToken) return;
-
-      if (
-        connection === 'open' &&
-        pairingMode === 'codigo' &&
-        !sock.authState.creds.registered &&
-        pairingNumber &&
-        !codeDelivered &&
-        !codeRequestRunning
-      ) {
-        codeRequestRunning = true;
-        try {
-          const code = await requestPairingCodeWithRetry(sock, pairingNumber, 8);
-          codeDelivered = true;
-          console.log('========================================');
-          console.log('CODIGO DE VINCULACION (NUMERO)');
-          console.log(`Numero: ${pairingNumber}`);
-          console.log(`Codigo: ${code}`);
-          console.log('========================================');
-          console.log('WhatsApp > Dispositivos vinculados > Vincular con numero');
-        } catch (error) {
-          console.log('No pude generar codigo por numero en este intento.');
-          console.log(`Detalle: ${String(error?.message || error)}`);
-          console.log('Si persiste, reinicia y usa modo qr.');
-          codeDelivered = false;
-        } finally {
-          codeRequestRunning = false;
-        }
-      }
+      if (token !== socketToken) return;
 
       if (connection === 'open') {
         reconnectAttempts = 0;
-        console.log('Bot conectado correctamente.');
-        writeConnectedState({
-          connected: true,
-          connectedAt: Date.now(),
-          mode: pairingMode,
-          botNumber: normalizeNumber(settings.botNumber || ''),
-        });
-        return;
-      }
+        console.log('Conexion abierta correctamente.');
 
-      if (connection === 'connecting' && !sock.authState.creds.registered && pairingMode === 'qr') {
-        console.log('Esperando escaneo QR desde WhatsApp...');
+        if (!sock.authState.creds.registered && !isQrMode && !codeRequested) {
+          codeRequested = true;
+          try {
+            const number = normalizeNumber(settings.botNumber || '');
+            const code = await requestCodeWithRetry(sock, number);
+            console.log('========================================');
+            console.log(`Codigo de vinculacion: ${code}`);
+            console.log('WhatsApp > Dispositivos vinculados > Vincular con numero');
+            console.log('========================================');
+          } catch (e) {
+            codeRequested = false;
+            console.log(`No pude generar codigo: ${String(e?.message || e)}`);
+          }
+        }
+        return;
       }
 
       if (connection === 'close') {
         const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode || 0;
+        console.log(`Conexion cerrada (${statusCode}). Reintentando...`);
 
         if (statusCode === 401 && !sock.authState?.creds?.registered) {
-          console.log('Detecte 401 antes de vincular. Limpio auth y reintento automaticamente...');
-          clearAuthFolder(authFolder);
+          console.log('Sesion previa invalida detectada, limpiando auth...');
+          clearAuthFolder();
         }
 
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-        if (shouldReconnect) scheduleReconnect();
+        if (statusCode !== DisconnectReason.loggedOut) {
+          scheduleReconnect();
+        }
       }
     });
 
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
-      if (localToken !== sessionToken) return;
+      if (token !== socketToken) return;
       if (type !== 'notify') return;
 
       const m = messages?.[0];
       if (!m || m.key.fromMe) return;
 
+      const prefix = String(settings.prefix || '.').trim() || '.';
       const body = getMessageText(m).trim();
       if (!body.startsWith(prefix)) return;
 
@@ -357,10 +245,7 @@ async function startBot() {
 
       await cmd.run(sock, m, args, from, isOwner(sender), {
         settings,
-        saveSettings: (patch = {}) => {
-          settings = saveSettings({ ...settings, ...(patch || {}) });
-          return settings;
-        },
+        saveSettings: (patch = {}) => saveSettings(patch),
         prefix,
         axios,
       });
@@ -369,7 +254,7 @@ async function startBot() {
     console.error('Error iniciando bot:', err);
     scheduleReconnect();
   } finally {
-    startupRunning = false;
+    booting = false;
   }
 }
 
