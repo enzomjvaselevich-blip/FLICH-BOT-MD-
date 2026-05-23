@@ -1,4 +1,9 @@
 const { callApi, extractMediaCandidates, extractTitle } = require('./_api');
+async function react(client, m, emoji) {
+  try {
+    await client.sendMessage(m.key.remoteJid, { react: { text: emoji, key: m.key } });
+  } catch {}
+}
 
 module.exports = {
   command: ['mediafire', 'mf'],
@@ -11,6 +16,7 @@ module.exports = {
       return;
     }
 
+    await react(client, m, '⏳');
     await client.sendMessage(from, {
       text: '╭━━━〔 MEDIAFIRE 〕━━⬣\n┃ ⏳ Obteniendo archivo...\n╰━━━━━━━━━━━━━━━━━━⬣',
     }, { quoted: m });
@@ -34,6 +40,7 @@ module.exports = {
             fileName,
             mimetype: 'application/octet-stream',
           }, { quoted: m });
+          await react(client, m, '✅');
           sent = true;
           break;
         } catch (e) {
@@ -43,6 +50,7 @@ module.exports = {
 
       if (!sent) throw new Error(lastError || 'No pude enviar el archivo de Mediafire.');
     } catch (error) {
+      await react(client, m, '❌');
       await client.sendMessage(from, { text: `Error en .mediafire: ${String(error?.message || error)}` }, { quoted: m });
     }
   },

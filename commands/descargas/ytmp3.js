@@ -2,6 +2,11 @@ const { extractMediaUrl, extractTitle, toAbsoluteUrl } = require('./_api');
 
 const API_BASE = 'https://dv-yer-api.online';
 const API_KEY = 'dvyer911840240197';
+async function react(client, m, emoji) {
+  try {
+    await client.sendMessage(m.key.remoteJid, { react: { text: emoji, key: m.key } });
+  } catch {}
+}
 
 function isYouTubeUrl(text = '') {
   return /(?:youtu\.be\/|youtube\.com\/)/i.test(String(text || ''));
@@ -44,6 +49,7 @@ module.exports = {
       return;
     }
 
+    await react(client, m, '⏳');
     await client.sendMessage(from, {
       text:
 `╔══════════════════════╗
@@ -90,9 +96,7 @@ module.exports = {
             mimetype: 'audio/mpeg',
             fileName: `${title}.mp3`,
           }, { quoted: m });
-          await client.sendMessage(from, {
-            text: `✅ MP3 enviado correctamente\n🎵 ${title}`,
-          }, { quoted: m });
+          await react(client, m, '✅');
           sent = true;
           break;
         } catch (e) {
@@ -104,6 +108,7 @@ module.exports = {
         throw new Error(lastError || 'No pude enviar el MP3.');
       }
     } catch (error) {
+      await react(client, m, '❌');
       await client.sendMessage(from, { text: `Error en .ytmp3: ${String(error?.message || error)}` }, { quoted: m });
     }
   },

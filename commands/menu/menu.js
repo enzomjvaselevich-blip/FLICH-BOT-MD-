@@ -42,6 +42,11 @@ module.exports = {
       '✦ Respuesta rapida y estable para descargas ✦',
     ];
 
-    await client.sendMessage(m.key.remoteJid, { text: lines.join('\n') }, { quoted: m });
+    const menuVideo = 'https://raw.githubusercontent.com/DevYerZx/Hiyuki-Bot/main/videos-imagenes/menu.mp4';
+    await client.sendMessage(m.key.remoteJid, {
+      video: { url: menuVideo },
+      gifPlayback: true,
+      caption: lines.join('\n'),
+    }, { quoted: m });
   },
 };

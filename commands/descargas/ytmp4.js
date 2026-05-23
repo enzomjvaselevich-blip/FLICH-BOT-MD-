@@ -2,6 +2,11 @@ const { extractMediaUrl, extractTitle, toAbsoluteUrl } = require('./_api');
 function isYouTubeUrl(text = '') {
   return /(?:youtu\.be\/|youtube\.com\/)/i.test(String(text || ''));
 }
+async function react(client, m, emoji) {
+  try {
+    await client.sendMessage(m.key.remoteJid, { react: { text: emoji, key: m.key } });
+  } catch {}
+}
 
 module.exports = {
   command: ['ytmp4', 'play2', 'video'],
@@ -14,6 +19,7 @@ module.exports = {
       return;
     }
 
+    await react(client, m, '⏳');
     await client.sendMessage(from, {
       text:
 `╔══════════════════════╗
@@ -60,7 +66,9 @@ module.exports = {
         video: { url: mediaUrl },
         caption: `✅ MP4 enviado correctamente\n🎬 ${title}`,
       }, { quoted: m });
+      await react(client, m, '✅');
     } catch (error) {
+      await react(client, m, '❌');
       await client.sendMessage(from, { text: `Error en .ytmp4: ${String(error?.message || error)}` }, { quoted: m });
     }
   },

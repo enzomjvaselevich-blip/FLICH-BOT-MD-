@@ -1,4 +1,9 @@
 const { callApi, extractMediaCandidates, extractTitle } = require('./_api');
+async function react(client, m, emoji) {
+  try {
+    await client.sendMessage(m.key.remoteJid, { react: { text: emoji, key: m.key } });
+  } catch {}
+}
 
 module.exports = {
   command: ['facebook', 'fb'],
@@ -11,6 +16,7 @@ module.exports = {
       return;
     }
 
+    await react(client, m, '⏳');
     await client.sendMessage(from, {
       text: '╭━━━〔 FACEBOOK 〕━━⬣\n┃ ⏳ Preparando descarga...\n╰━━━━━━━━━━━━━━━━━━⬣',
     }, { quoted: m });
@@ -33,6 +39,7 @@ module.exports = {
             video: { url: mediaUrl },
             caption: `✅ Facebook descargado\n🎬 ${title}`,
           }, { quoted: m });
+          await react(client, m, '✅');
           sent = true;
           break;
         } catch (e) {
@@ -42,6 +49,7 @@ module.exports = {
 
       if (!sent) throw new Error(lastError || 'No pude enviar el video de Facebook.');
     } catch (error) {
+      await react(client, m, '❌');
       await client.sendMessage(from, { text: `Error en .facebook: ${String(error?.message || error)}` }, { quoted: m });
     }
   },

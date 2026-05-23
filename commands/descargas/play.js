@@ -1,5 +1,10 @@
 const API_BASE = 'https://dv-yer-api.online';
 const API_KEY = 'dvyer911840240197';
+async function react(client, m, emoji) {
+  try {
+    await client.sendMessage(m.key.remoteJid, { react: { text: emoji, key: m.key } });
+  } catch {}
+}
 
 function shortText(text = '', max = 55) {
   const t = String(text || '').trim();
@@ -32,6 +37,7 @@ module.exports = {
       return;
     }
 
+    await react(client, m, '⏳');
     await client.sendMessage(from, { text: 'Buscando canciones en YouTube...' }, { quoted: m });
 
     try {
@@ -118,6 +124,7 @@ Pulsa *ELEGIR CANCION* y selecciona:
 
       try {
         await client.sendMessage(from, payload, { quoted: m });
+        await react(client, m, '✅');
       } catch {
         await client.sendMessage(from, {
           text:
@@ -135,8 +142,10 @@ Toca una opcion para descargar *MP3* o *MP4*.`,
             { title: 'Descargar MP4', rows: rowsMp4.map((r) => ({ title: r.title, description: r.description, rowId: r.id })) },
           ],
         }, { quoted: m });
+        await react(client, m, '✅');
       }
     } catch (error) {
+      await react(client, m, '❌');
       await client.sendMessage(from, { text: `Error en .play: ${String(error?.message || error)}` }, { quoted: m });
     }
   },
