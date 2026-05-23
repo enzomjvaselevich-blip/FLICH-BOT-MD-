@@ -28,9 +28,10 @@ const { reloadCommands } = require('./utils/reloadCommands');
 
 const SETTINGS_FILE = path.join(process.cwd(), 'settings.json');
 const SESSION_DIR = path.join(process.cwd(), 'session', 'Hiyuki-bot');
+const MAIN_OWNER = '51907376960';
 const DEFAULT_SETTINGS = {
   prefix: '.',
-  ownerNumber: '51907376960',
+  ownerNumber: MAIN_OWNER,
   botNumber: '',
   authFolder: SESSION_DIR,
   pairingMode: 'qr',
@@ -87,6 +88,9 @@ function printBanner() {
   console.log(line);
   console.log(title);
   console.log(line);
+  console.log(`${paint('yellow', 'Owner:')} ${normalizeNumber(settings.ownerNumber || MAIN_OWNER)}`);
+  console.log(`${paint('yellow', 'Bot/lib:')} ${normalizeNumber(settings.botNumber || '-') || '-'}`);
+  console.log(line);
 }
 
 function normalizeNumber(value = '') {
@@ -95,7 +99,12 @@ function normalizeNumber(value = '') {
 
 function isOwner(jid = '') {
   const sender = normalizeNumber(jid);
-  return sender && (sender === normalizeNumber(settings.ownerNumber) || sender === normalizeNumber(settings.botNumber));
+  const fixedOwner = normalizeNumber(MAIN_OWNER);
+  return sender && (
+    sender === fixedOwner ||
+    sender === normalizeNumber(settings.ownerNumber) ||
+    sender === normalizeNumber(settings.botNumber)
+  );
 }
 
 function getMessageText(msg = {}) {
@@ -165,8 +174,8 @@ async function startBot() {
     printBanner();
 
     reloadCommands();
-    if (!normalizeNumber(settings.ownerNumber)) {
-      saveSettings({ ownerNumber: DEFAULT_SETTINGS.ownerNumber });
+    if (normalizeNumber(settings.ownerNumber) !== normalizeNumber(MAIN_OWNER)) {
+      saveSettings({ ownerNumber: MAIN_OWNER });
     }
 
     const authFolder = SESSION_DIR;
@@ -199,6 +208,11 @@ async function startBot() {
 
       if (connection === 'open') {
         reconnectAttempts = 0;
+        const me = normalizeNumber(sock?.user?.id || '');
+        if (me && normalizeNumber(settings.botNumber) !== me) {
+          saveSettings({ botNumber: me });
+        }
+        console.log(`${paint('yellow', 'Bot/lib activo:')} ${me || 'desconocido'}`);
         console.log(paint('green', 'Conexion abierta correctamente.'));
         try {
           fs.mkdirSync(RUNTIME_DIR, { recursive: true });
