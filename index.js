@@ -1,5 +1,5 @@
-require('dotenv').config();
-
+const fs = require('fs');
+const path = require('path');
 const pino = require('pino');
 const readline = require('readline');
 const { Boom } = require('@hapi/boom');
@@ -22,10 +22,35 @@ try {
 
 const { reloadCommands } = require('./utils/reloadCommands');
 
-const PREFIX = process.env.BOT_PREFIX || '.';
-const OWNER_NUMBER = String(process.env.OWNER_NUMBER || '').replace(/\D/g, '');
-const BOT_NUMBER = String(process.env.BOT_NUMBER || '').replace(/\D/g, '');
-const AUTH_FOLDER = process.env.AUTH_FOLDER || 'auth_info_baileys';
+const SETTINGS_FILE = path.join(process.cwd(), 'settings.json');
+const DEFAULT_SETTINGS = {
+  prefix: '.',
+  ownerNumber: '',
+  botNumber: '',
+  authFolder: 'auth_info_baileys',
+};
+
+function loadSettings() {
+  try {
+    if (!fs.existsSync(SETTINGS_FILE)) {
+      fs.writeFileSync(SETTINGS_FILE, JSON.stringify(DEFAULT_SETTINGS, null, 2));
+      return { ...DEFAULT_SETTINGS };
+    }
+
+    const parsed = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
+    return { ...DEFAULT_SETTINGS, ...(parsed || {}) };
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+function saveSettings(nextSettings = {}) {
+  const safe = { ...DEFAULT_SETTINGS, ...(nextSettings || {}) };
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(safe, null, 2));
+  return safe;
+}
+
+let settings = loadSettings();
 
 function normalizeNumber(value = '') {
   return String(value || '').split('@')[0].split(':')[0].replace(/\D/g, '');
@@ -45,21 +70,37 @@ function askQuestion(question) {
 }
 
 async function getPairingTargetNumber() {
-  if (BOT_NUMBER) return BOT_NUMBER;
+  const savedNumber = normalizeNumber(settings.botNumber || '');
+  if (savedNumber) return savedNumber;
+
   const input = await askQuestion('Numero para vincular (ej: 51912345678): ');
   const parsed = String(input || '').replace(/\D/g, '');
   if (!parsed) throw new Error('Numero invalido.');
+
+  settings = saveSettings({
+    ...settings,
+    botNumber: parsed,
+    ownerNumber: normalizeNumber(settings.ownerNumber || '') || parsed,
+  });
+
   return parsed;
 }
 
 function isOwner(jid = '') {
-  return normalizeNumber(jid) === OWNER_NUMBER;
+  const sender = normalizeNumber(jid);
+  if (!sender) return false;
+
+  const owner = normalizeNumber(settings.ownerNumber || '');
+  const bot = normalizeNumber(settings.botNumber || '');
+  return sender === owner || sender === bot;
 }
 
 async function startBot() {
   reloadCommands();
 
-  const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
+  const authFolder = String(settings.authFolder || 'auth_info_baileys').trim() || 'auth_info_baileys';
+  const prefix = String(settings.prefix || '.').trim() || '.';
+  const { state, saveCreds } = await useMultiFileAuthState(authFolder);
   const { version } = await fetchLatestBaileysVersion();
 
   const sock = makeWASocket({
@@ -90,6 +131,7 @@ async function startBot() {
     const number = await getPairingTargetNumber();
     const code = await sock.requestPairingCode(number);
     console.log(`Codigo de vinculacion: ${code}`);
+    console.log('WhatsApp > Dispositivos vinculados > Vincular con numero');
   }
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
@@ -98,9 +140,9 @@ async function startBot() {
     if (!m || m.key.fromMe) return;
 
     const body = getMessageText(m).trim();
-    if (!body.startsWith(PREFIX)) return;
+    if (!body.startsWith(prefix)) return;
 
-    const args = body.slice(PREFIX.length).trim().split(/\s+/);
+    const args = body.slice(prefix.length).trim().split(/\s+/);
     const commandName = String(args.shift() || '').toLowerCase();
     const cmd = global.comandos?.get(commandName);
     if (!cmd) return;

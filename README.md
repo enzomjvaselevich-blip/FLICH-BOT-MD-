@@ -7,7 +7,7 @@ Base inicial del bot WhatsApp con Baileys.
 - `.update`
 
 ## Inicio rapido
-1. `cp .env.example .env`
-2. Completa `OWNER_NUMBER` y `BOT_NUMBER`
-3. `npm install`
-4. `npm start`
+1. `npm install`
+2. `npm start`
+3. Al primer inicio, escribe tu numero para vincular.
+4. El bot crea `settings.json` automaticamente (sin `.env`).
