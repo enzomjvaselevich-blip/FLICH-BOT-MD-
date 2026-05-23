@@ -17,9 +17,6 @@ module.exports = {
     }
 
     await react(client, m, '⏳');
-    await client.sendMessage(from, {
-      text: '╭━━━〔 MEDIAFIRE 〕━━⬣\n┃ ⏳ Obteniendo archivo...\n╰━━━━━━━━━━━━━━━━━━⬣',
-    }, { quoted: m });
 
     try {
       const result = await callApi(ctx, 'mediafire', { url: link, mode: 'link' });

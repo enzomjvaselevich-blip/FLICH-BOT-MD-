@@ -37,6 +37,8 @@ const DEFAULT_SETTINGS = {
   pairingMode: 'qr',
   apiBaseUrl: 'https://dv-yer-api.online',
   apiKey: 'dvyer911840240197',
+  antiPrivate: false,
+  groupOptions: {},
 };
 const RUNTIME_DIR = path.join(process.cwd(), 'runtime');
 const CONNECTED_FILE = path.join(RUNTIME_DIR, 'connected.json');
@@ -105,6 +107,13 @@ function isOwner(jid = '') {
     sender === normalizeNumber(settings.ownerNumber) ||
     sender === normalizeNumber(settings.botNumber)
   );
+}
+
+function getGroupOptions(chatId = '') {
+  const all = settings?.groupOptions && typeof settings.groupOptions === 'object'
+    ? settings.groupOptions
+    : {};
+  return all[chatId] || {};
 }
 
 function getMessageText(msg = {}) {
@@ -287,9 +296,36 @@ async function startBot() {
 
       const m = messages?.[0];
       if (!m || m.key.fromMe) return;
+      const from = m.key.remoteJid;
+      const sender = m.key.participant || from;
+      const body = getMessageText(m).trim();
+      const isGroup = String(from || '').endsWith('@g.us');
+      const groupOpts = isGroup ? getGroupOptions(from) : {};
+      let metadata = null;
+      let senderIsAdmin = false;
+
+      if (isGroup && (groupOpts.antilink || groupOpts.modoadmin)) {
+        try {
+          metadata = await sock.groupMetadata(from);
+          const p = (metadata?.participants || []).find((x) => x.id === sender);
+          senderIsAdmin = Boolean(p?.admin);
+        } catch {}
+      }
+
+      if (!isGroup && settings.antiPrivate && !isOwner(sender)) {
+        await sock.sendMessage(from, { text: '🚫 Anti-privado activo. Usa comandos solo en grupos autorizados.' }, { quoted: m });
+        return;
+      }
+
+      if (isGroup && groupOpts.antilink && /(https?:\/\/|wa\.me\/|chat\.whatsapp\.com\/)/i.test(body)) {
+        if (!isOwner(sender) && !senderIsAdmin) {
+          try { await sock.sendMessage(from, { delete: m.key }); } catch {}
+          await sock.sendMessage(from, { text: `⚠️ @${normalizeNumber(sender)} enlaces no permitidos.`, mentions: [sender] }, { quoted: m });
+          return;
+        }
+      }
 
       const prefix = String(settings.prefix || '.').trim() || '.';
-      const body = getMessageText(m).trim();
       if (!body.startsWith(prefix)) return;
 
       const args = body.slice(prefix.length).trim().split(/\s+/);
@@ -297,8 +333,6 @@ async function startBot() {
       const cmd = global.comandos?.get(commandName);
       if (!cmd) return;
 
-      const from = m.key.remoteJid;
-      const sender = m.key.participant || from;
       const place = String(from || '').endsWith('@g.us') ? 'GRUPO' : 'PRIVADO';
       const senderNum = normalizeNumber(sender) || 'desconocido';
       console.log(
@@ -309,6 +343,34 @@ async function startBot() {
 
       if (cmd.isOwner && !isOwner(sender)) {
         await sock.sendMessage(from, { text: 'Solo el owner puede usar este comando.' }, { quoted: m });
+        return;
+      }
+
+      if (cmd.group && !isGroup) {
+        await sock.sendMessage(from, { text: 'Este comando solo funciona en grupos.' }, { quoted: m });
+        return;
+      }
+
+      if (cmd.admin) {
+        if (!isGroup) {
+          await sock.sendMessage(from, { text: 'Este comando requiere grupo y admin.' }, { quoted: m });
+          return;
+        }
+        if (!metadata) {
+          try {
+            metadata = await sock.groupMetadata(from);
+            const p = (metadata?.participants || []).find((x) => x.id === sender);
+            senderIsAdmin = Boolean(p?.admin);
+          } catch {}
+        }
+        if (!isOwner(sender) && !senderIsAdmin) {
+          await sock.sendMessage(from, { text: 'Solo administradores pueden usar este comando.' }, { quoted: m });
+          return;
+        }
+      }
+
+      if (isGroup && groupOpts.modoadmin && !isOwner(sender) && !senderIsAdmin) {
+        await sock.sendMessage(from, { text: '🚫 Modo admin activo. Solo administradores pueden usar comandos.' }, { quoted: m });
         return;
       }
 

@@ -6,7 +6,7 @@ async function measureMs(fn) {
 }
 
 module.exports = {
-  command: ['speed', 'velocidad', 'ping'],
+  command: ['speed', 'velocidad', 'ping', 'internet', 'conexion'],
   description: 'Mide latencia y velocidad basica (sin mostrar IP)',
   categoria: 'sistema',
   run: async (client, m, args, from, isCreator, ctx = {}) => {

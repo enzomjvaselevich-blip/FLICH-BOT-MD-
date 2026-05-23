@@ -38,9 +38,6 @@ module.exports = {
     }
 
     await react(client, m, '⏳');
-    await client.sendMessage(from, {
-      text: '╭─❍ *HIYUKI PLAY* ❍─╮\n_🔎 Buscando en YouTube..._\n╰──────────────╯',
-    }, { quoted: m });
 
     try {
       const search = await axios.get(`${API_BASE}/ytsearch`, {

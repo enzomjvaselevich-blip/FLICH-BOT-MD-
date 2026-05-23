@@ -17,9 +17,6 @@ module.exports = {
     }
 
     await react(client, m, '⏳');
-    await client.sendMessage(from, {
-      text: '╭━━━〔 TIKTOK 〕━━⬣\n┃ ⏳ Procesando enlace...\n╰━━━━━━━━━━━━━━⬣',
-    }, { quoted: m });
 
     try {
       const result = await callApi(ctx, 'ttdlmp4', { url: link, mode: 'link' });
@@ -37,7 +34,7 @@ module.exports = {
         try {
           await client.sendMessage(from, {
             video: { url: mediaUrl },
-            caption: `✅ TikTok descargado\n🎬 ${title}`,
+            caption: `🎬 ${title}`,
           }, { quoted: m });
           await react(client, m, '✅');
           sent = true;

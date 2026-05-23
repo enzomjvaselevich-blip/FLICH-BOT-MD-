@@ -20,14 +20,6 @@ module.exports = {
     }
 
     await react(client, m, '⏳');
-    await client.sendMessage(from, {
-      text:
-`╔══════════════════════╗
-║  *HIYUKI MP4 ENGINE* ║
-╚══════════════════════╝
-_🔎 Buscando video..._
-⏳ *Preparando descarga MP4*`,
-    }, { quoted: m });
 
     try {
       const axios = ctx?.axios;
@@ -64,7 +56,7 @@ _🔎 Buscando video..._
 
       await client.sendMessage(from, {
         video: { url: mediaUrl },
-        caption: `✅ *MP4 enviado correctamente*\n🎬 _${title}_`,
+        caption: `🎬 _${title}_`,
       }, { quoted: m });
       await react(client, m, '✅');
     } catch (error) {

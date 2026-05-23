@@ -50,14 +50,6 @@ module.exports = {
     }
 
     await react(client, m, '⏳');
-    await client.sendMessage(from, {
-      text:
-`╔══════════════════════╗
-║  *HIYUKI MP3 ENGINE* ║
-╚══════════════════════╝
-_🔎 Buscando audio..._
-⏳ *Preparando descarga MP3*`,
-    }, { quoted: m });
 
     try {
       let targetUrl = query;

@@ -17,9 +17,6 @@ module.exports = {
     }
 
     await react(client, m, '⏳');
-    await client.sendMessage(from, {
-      text: '╭━━━〔 INSTAGRAM 〕━━⬣\n┃ ⏳ Procesando publicacion...\n╰━━━━━━━━━━━━━━━━━━━⬣',
-    }, { quoted: m });
 
     try {
       const result = await callApi(ctx, 'instagram', { url: link, mode: 'link', pick: 1, lang: 'es' });
@@ -37,7 +34,7 @@ module.exports = {
         try {
           await client.sendMessage(from, {
             video: { url: mediaUrl },
-            caption: `✅ Instagram descargado\n🎬 ${title}`,
+            caption: `🎬 ${title}`,
           }, { quoted: m });
           await react(client, m, '✅');
           sent = true;
