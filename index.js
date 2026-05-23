@@ -46,6 +46,7 @@ const DEFAULT_SETTINGS = {
   ownerNumber: '',
   botNumber: '',
   authFolder: 'auth_info_baileys',
+  pairingMode: 'codigo',
   apiBaseUrl: '',
   apiKey: '',
 };
@@ -99,6 +100,7 @@ let pairingInProgress = false;
 let pairingRequestedForCurrentSocket = false;
 let targetPairingNumber = '';
 let pairingCodePrinted = false;
+let currentPairingMode = 'codigo';
 
 async function getPairingTargetNumber() {
   if (promptRunning) {
@@ -122,6 +124,29 @@ async function getPairingTargetNumber() {
   });
 
   return parsed;
+}
+
+async function getPairingMode() {
+  if (promptRunning) {
+    throw new Error('Ya hay una solicitud de modo en progreso.');
+  }
+
+  promptRunning = true;
+  const saved = String(settings.pairingMode || 'codigo').toLowerCase();
+  const input = await askQuestion(
+    `Modo de vinculacion [codigo/qr] (actual ${saved}, Enter para usarlo): `
+  );
+  promptRunning = false;
+  const normalized = String(input || '').trim().toLowerCase();
+  const mode = normalized || saved;
+  const finalMode = mode === 'qr' ? 'qr' : 'codigo';
+
+  settings = saveSettings({
+    ...settings,
+    pairingMode: finalMode,
+  });
+
+  return finalMode;
 }
 
 function isOwner(jid = '') {
@@ -208,16 +233,22 @@ async function startBot() {
   pairingCodePrinted = false;
   if (!state?.creds?.registered) {
     try {
-      targetPairingNumber = await getPairingTargetNumber();
-      console.log(`Numero objetivo para vinculacion: ${targetPairingNumber}`);
+      currentPairingMode = await getPairingMode();
+      console.log(`Modo de vinculacion activo: ${currentPairingMode.toUpperCase()}`);
+      if (currentPairingMode === 'codigo') {
+        targetPairingNumber = await getPairingTargetNumber();
+        console.log(`Numero objetivo para vinculacion: ${targetPairingNumber}`);
+      } else {
+        targetPairingNumber = '';
+      }
     } catch (error) {
-      console.log(`No pude leer numero para vinculacion: ${String(error?.message || error)}`);
+      console.log(`No pude preparar vinculacion: ${String(error?.message || error)}`);
     }
   }
 
   const sock = makeWASocket({
     version,
-    printQRInTerminal: false,
+    printQRInTerminal: !state?.creds?.registered && currentPairingMode === 'qr',
     logger: pino({ level: 'silent' }),
     auth: state,
     browser: ['HIYUKI BOT', 'Chrome', '1.0.0'],
@@ -229,6 +260,8 @@ async function startBot() {
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
     if (
+      connection === 'open' &&
+      currentPairingMode === 'codigo' &&
       !sock.authState.creds.registered &&
       !pairingCodePrinted &&
       !pairingInProgress &&
@@ -248,6 +281,7 @@ async function startBot() {
       } catch (error) {
         console.log('No pude generar codigo por numero en este intento.');
         console.log(`Detalle: ${String(error?.message || error)}`);
+        console.log('Si persiste, reinicia y usa modo QR temporalmente.');
       } finally {
         pairingInProgress = false;
       }
@@ -257,6 +291,10 @@ async function startBot() {
       console.log('Bot conectado.');
       reconnectAttempts = 0;
       return;
+    }
+
+    if (connection === 'connecting' && !sock.authState.creds.registered && currentPairingMode === 'qr') {
+      console.log('Esperando escaneo QR desde WhatsApp...');
     }
 
     if (connection === 'close') {
