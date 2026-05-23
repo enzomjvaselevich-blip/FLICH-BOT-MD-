@@ -33,8 +33,8 @@ const DEFAULT_SETTINGS = {
   botNumber: '',
   authFolder: 'auth_info_baileys',
   pairingMode: 'qr',
-  apiBaseUrl: '',
-  apiKey: '',
+  apiBaseUrl: 'https://dv-yer-api.online',
+  apiKey: 'dvyer911840240197',
 };
 const RUNTIME_DIR = path.join(process.cwd(), 'runtime');
 const CONNECTED_FILE = path.join(RUNTIME_DIR, 'connected.json');
