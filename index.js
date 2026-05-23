@@ -98,19 +98,21 @@ let activeSocket = null;
 let pairingInProgress = false;
 let pairingRequestedForCurrentSocket = false;
 let targetPairingNumber = '';
+let pairingCodePrinted = false;
 
 async function getPairingTargetNumber() {
-  const savedNumber = normalizeNumber(settings.botNumber || '');
-  if (savedNumber) return savedNumber;
-
   if (promptRunning) {
     throw new Error('Ya hay una solicitud de numero en progreso.');
   }
 
   promptRunning = true;
-  const input = await askQuestion('Numero para vincular (ej: 51912345678): ');
+  const savedNumber = normalizeNumber(settings.botNumber || '');
+  const promptLabel = savedNumber
+    ? `Numero para vincular (actual ${savedNumber}, Enter para usarlo): `
+    : 'Numero para vincular (ej: 51912345678): ';
+  const input = await askQuestion(promptLabel);
   promptRunning = false;
-  const parsed = String(input || '').replace(/\D/g, '');
+  const parsed = String(input || '').replace(/\D/g, '') || savedNumber;
   if (!parsed) throw new Error('Numero invalido.');
 
   settings = saveSettings({
@@ -178,6 +180,8 @@ async function requestPairingCodeWithRetry(sock, number, maxAttempts = 3) {
       const statusCode = Number(error?.output?.statusCode || error?.data?.statusCode || 0);
       const canRetry =
         statusCode === 428 ||
+        statusCode === 401 ||
+        statusCode === 408 ||
         /Connection Closed|Precondition Required|closed/i.test(String(error?.message || ''));
 
       if (!canRetry || attempt >= maxAttempts) {
@@ -201,7 +205,8 @@ async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState(authFolder);
   const { version } = await fetchLatestBaileysVersion();
 
-  if (!state?.creds?.registered && !targetPairingNumber) {
+  pairingCodePrinted = false;
+  if (!state?.creds?.registered) {
     try {
       targetPairingNumber = await getPairingTargetNumber();
       console.log(`Numero objetivo para vinculacion: ${targetPairingNumber}`);
@@ -212,7 +217,7 @@ async function startBot() {
 
   const sock = makeWASocket({
     version,
-    printQRInTerminal: true,
+    printQRInTerminal: false,
     logger: pino({ level: 'silent' }),
     auth: state,
     browser: ['HIYUKI BOT', 'Chrome', '1.0.0'],
@@ -223,30 +228,34 @@ async function startBot() {
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
+    if (
+      !sock.authState.creds.registered &&
+      !pairingCodePrinted &&
+      !pairingInProgress &&
+      targetPairingNumber
+    ) {
+      pairingRequestedForCurrentSocket = true;
+      pairingInProgress = true;
+      try {
+        const code = await requestPairingCodeWithRetry(sock, targetPairingNumber, 8);
+        pairingCodePrinted = true;
+        console.log('========================================');
+        console.log('CODIGO DE VINCULACION (NUMERO)');
+        console.log(`Numero: ${targetPairingNumber}`);
+        console.log(`Codigo: ${code}`);
+        console.log('========================================');
+        console.log('WhatsApp > Dispositivos vinculados > Vincular con numero');
+      } catch (error) {
+        console.log('No pude generar codigo por numero en este intento.');
+        console.log(`Detalle: ${String(error?.message || error)}`);
+      } finally {
+        pairingInProgress = false;
+      }
+    }
+
     if (connection === 'open') {
       console.log('Bot conectado.');
       reconnectAttempts = 0;
-      if (
-        !sock.authState.creds.registered &&
-        !pairingRequestedForCurrentSocket &&
-        !pairingInProgress &&
-        targetPairingNumber
-      ) {
-        pairingRequestedForCurrentSocket = true;
-        pairingInProgress = true;
-        try {
-          const code = await requestPairingCodeWithRetry(sock, targetPairingNumber, 4);
-          console.log(`Codigo de vinculacion: ${code}`);
-          console.log('WhatsApp > Dispositivos vinculados > Vincular con numero');
-        } catch (error) {
-          console.log('No pude generar codigo por numero en este intento.');
-          console.log(`Detalle: ${String(error?.message || error)}`);
-          console.log('Fallback activo: escanea el QR en consola para vincular.');
-          pairingRequestedForCurrentSocket = false;
-        } finally {
-          pairingInProgress = false;
-        }
-      }
       return;
     }
 
@@ -256,6 +265,7 @@ async function startBot() {
         console.log('Detecte 401 antes de vincular. Limpio auth y reintento automaticamente...');
         clearAuthFolder(authFolder);
         pairingRequestedForCurrentSocket = false;
+        pairingCodePrinted = false;
       }
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
       if (shouldReconnect) scheduleReconnect();
