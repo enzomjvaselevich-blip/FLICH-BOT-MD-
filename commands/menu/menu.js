@@ -4,23 +4,39 @@ module.exports = {
   categoria: 'general',
   run: async (client, m, args, from, isCreator, ctx = {}) => {
     const prefix = ctx?.prefix || '.';
+    const settings = ctx?.settings || {};
+    const owner = String(settings.ownerNumber || '51907376960');
+    const apiReady = Boolean(String(settings.apiBaseUrl || '').trim() && String(settings.apiKey || '').trim());
     const lines = [
-      '=== HIYUKI-BOT ===',
+      '╔════════════════════════════╗',
+      '║       HIYUKI-BOT  華       ║',
+      '╚════════════════════════════╝',
       '',
-      '*GENERAL*',
-      `- ${prefix}menu`,
+      '┌─ 〘 ESTADO 〙',
+      `│ Prefix: ${prefix}`,
+      `│ API: ${apiReady ? 'Activa' : 'Pendiente'}`,
+      `│ Owner: ${owner}`,
+      '└──────────────',
       '',
-      '*DESCARGAS*',
-      `- ${prefix}play nombre cancion`,
-      `- ${prefix}ytmp4 nombre o link`,
-      `- ${prefix}tiktok <link>`,
-      `- ${prefix}facebook <link>`,
-      `- ${prefix}instagram <link>`,
-      `- ${prefix}mediafire <link>`,
+      '┌─ 〘 GENERAL 〙',
+      `│ ${prefix}menu`,
+      '└──────────────',
       '',
-      '*OWNER*',
-      `- ${prefix}update`,
-      `- ${prefix}setapi auto (opcional)`,
+      '┌─ 〘 DESCARGAS 〙',
+      `│ ${prefix}play <nombre/link>`,
+      `│ ${prefix}ytmp4 <nombre/link>`,
+      `│ ${prefix}tiktok <link>`,
+      `│ ${prefix}facebook <link>`,
+      `│ ${prefix}instagram <link>`,
+      `│ ${prefix}mediafire <link>`,
+      '└──────────────',
+      '',
+      '┌─ 〘 OWNER 〙',
+      `│ ${prefix}update`,
+      `│ ${prefix}setapi auto`,
+      '└──────────────',
+      '',
+      '✦ Respuesta rapida y estable para descargas ✦',
     ];
 
     await client.sendMessage(m.key.remoteJid, { text: lines.join('\n') }, { quoted: m });
