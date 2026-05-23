@@ -32,10 +32,12 @@ const DEFAULT_SETTINGS = {
   ownerNumber: '',
   botNumber: '',
   authFolder: 'auth_info_baileys',
-  pairingMode: 'codigo',
+  pairingMode: 'qr',
   apiBaseUrl: '',
   apiKey: '',
 };
+const RUNTIME_DIR = path.join(process.cwd(), 'runtime');
+const CONNECTED_FILE = path.join(RUNTIME_DIR, 'connected.json');
 
 let settings = loadSettings();
 let booting = false;
@@ -99,24 +101,8 @@ function delay(ms) {
 }
 
 async function ensurePairingConfig() {
-  const modeRaw = String(settings.pairingMode || 'codigo').toLowerCase();
-  const mode = modeRaw === 'qr' ? 'qr' : 'codigo';
-  saveSettings({ pairingMode: mode });
-
-  if (mode === 'codigo') {
-    const saved = normalizeNumber(settings.botNumber || '');
-    const answer = await ask(
-      saved
-        ? `Numero para vincular (actual ${saved}, Enter para usarlo): `
-        : 'Numero para vincular (ej: 51912345678): '
-    );
-    const number = normalizeNumber(answer) || saved;
-    if (!number) throw new Error('Numero invalido para vinculacion por codigo.');
-    saveSettings({ botNumber: number, ownerNumber: normalizeNumber(settings.ownerNumber || '') || number });
-    console.log(`Numero objetivo: ${number}`);
-  } else {
-    console.log('Modo QR activo. Escanea el QR de la consola.');
-  }
+  saveSettings({ pairingMode: 'qr' });
+  console.log('Modo QR activo. Escanea el QR de la consola.');
 }
 
 function scheduleReconnect() {
@@ -168,7 +154,7 @@ async function startBot() {
     }
 
     const { version } = await fetchLatestBaileysVersion();
-    const isQrMode = String(settings.pairingMode || 'codigo').toLowerCase() === 'qr';
+    const isQrMode = true;
 
     const sock = makeWASocket({
       version,
@@ -186,6 +172,10 @@ async function startBot() {
       if (connection === 'open') {
         reconnectAttempts = 0;
         console.log('Conexion abierta correctamente.');
+        try {
+          fs.mkdirSync(RUNTIME_DIR, { recursive: true });
+          fs.writeFileSync(CONNECTED_FILE, JSON.stringify({ connected: true, at: Date.now() }, null, 2));
+        } catch {}
 
         if (!sock.authState.creds.registered && !isQrMode && !codeRequested) {
           codeRequested = true;
