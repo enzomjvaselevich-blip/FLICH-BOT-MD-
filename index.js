@@ -4,12 +4,12 @@ const pino = require('pino');
 const readline = require('readline');
 const { Boom } = require('@hapi/boom');
 const axios = require('axios');
+
 let makeWASocket;
 let useMultiFileAuthState;
 let fetchLatestBaileysVersion;
 let DisconnectReason;
 
-let loadError = null;
 try {
   ({
     default: makeWASocket,
@@ -17,25 +17,11 @@ try {
     fetchLatestBaileysVersion,
     DisconnectReason,
   } = require('fsociety-Baileys'));
-} catch (err1) {
-  loadError = err1;
-  try {
-    ({
-      default: makeWASocket,
-      useMultiFileAuthState,
-      fetchLatestBaileysVersion,
-      DisconnectReason,
-    } = require('baileys-fsociety'));
-  } catch (err2) {
-    loadError = err2 || loadError;
-    console.log('No pude cargar tu Baileys personalizado.');
-    if (loadError?.message) {
-      console.log(`Detalle: ${loadError.message}`);
-    }
-    console.log('Ejecuta: npm install');
-    console.log('Si sigue igual, ejecuta: rm -rf node_modules package-lock.json && npm install');
-    process.exit(1);
-  }
+} catch (err) {
+  console.log('No pude cargar tu Baileys personalizado.');
+  console.log(`Detalle: ${String(err?.message || err)}`);
+  console.log('Ejecuta: npm install');
+  process.exit(1);
 }
 
 const { reloadCommands } = require('./utils/reloadCommands');
@@ -50,6 +36,17 @@ const DEFAULT_SETTINGS = {
   apiBaseUrl: '',
   apiKey: '',
 };
+
+const RUNTIME_DIR = path.join(process.cwd(), 'runtime');
+const CONNECTED_STATE_FILE = path.join(RUNTIME_DIR, 'last-connected.json');
+
+let settings = loadSettings();
+let startupRunning = false;
+let bannerPrinted = false;
+let reconnectTimer = null;
+let reconnectAttempts = 0;
+let pairPromptInProgress = false;
+let sessionToken = 0;
 
 function loadSettings() {
   try {
@@ -71,7 +68,18 @@ function saveSettings(nextSettings = {}) {
   return safe;
 }
 
-let settings = loadSettings();
+function ensureDir(dirPath) {
+  try {
+    fs.mkdirSync(dirPath, { recursive: true });
+  } catch {}
+}
+
+function writeConnectedState(payload = {}) {
+  ensureDir(RUNTIME_DIR);
+  try {
+    fs.writeFileSync(CONNECTED_STATE_FILE, JSON.stringify(payload, null, 2));
+  } catch {}
+}
 
 function normalizeNumber(value = '') {
   return String(value || '').split('@')[0].split(':')[0].replace(/\D/g, '');
@@ -92,88 +100,12 @@ function askQuestion(question) {
   });
 }
 
-let promptRunning = false;
-let reconnectTimer = null;
-let reconnectAttempts = 0;
-let activeSocket = null;
-let pairingInProgress = false;
-let pairingRequestedForCurrentSocket = false;
-let targetPairingNumber = '';
-let pairingCodePrinted = false;
-let currentPairingMode = 'codigo';
-
-async function getPairingTargetNumber() {
-  if (promptRunning) {
-    throw new Error('Ya hay una solicitud de numero en progreso.');
-  }
-
-  promptRunning = true;
-  const savedNumber = normalizeNumber(settings.botNumber || '');
-  const promptLabel = savedNumber
-    ? `Numero para vincular (actual ${savedNumber}, Enter para usarlo): `
-    : 'Numero para vincular (ej: 51912345678): ';
-  const input = await askQuestion(promptLabel);
-  promptRunning = false;
-  const parsed = String(input || '').replace(/\D/g, '') || savedNumber;
-  if (!parsed) throw new Error('Numero invalido.');
-
-  settings = saveSettings({
-    ...settings,
-    botNumber: parsed,
-    ownerNumber: normalizeNumber(settings.ownerNumber || '') || parsed,
-  });
-
-  return parsed;
-}
-
-async function getPairingMode() {
-  if (promptRunning) {
-    throw new Error('Ya hay una solicitud de modo en progreso.');
-  }
-
-  promptRunning = true;
-  const saved = String(settings.pairingMode || 'codigo').toLowerCase();
-  const input = await askQuestion(
-    `Modo de vinculacion [codigo/qr] (actual ${saved}, Enter para usarlo): `
-  );
-  promptRunning = false;
-  const normalized = String(input || '').trim().toLowerCase();
-  const mode = normalized || saved;
-  const finalMode = mode === 'qr' ? 'qr' : 'codigo';
-
-  settings = saveSettings({
-    ...settings,
-    pairingMode: finalMode,
-  });
-
-  return finalMode;
-}
-
-function isOwner(jid = '') {
-  const sender = normalizeNumber(jid);
-  if (!sender) return false;
-
-  const owner = normalizeNumber(settings.ownerNumber || '');
-  const bot = normalizeNumber(settings.botNumber || '');
-  return sender === owner || sender === bot;
-}
-
 function buildBanner() {
   return [
     '========================================',
     '         HIYUKI-BOT | FSOCIETY',
     '========================================',
   ].join('\n');
-}
-
-function scheduleReconnect() {
-  if (reconnectTimer) return;
-  reconnectAttempts += 1;
-  const waitMs = Math.min(15_000, 1500 + reconnectAttempts * 1200);
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = null;
-    startBot().catch((err) => console.error('Error reiniciando bot:', err));
-  }, waitMs);
 }
 
 function clearAuthFolder(targetFolder = '') {
@@ -191,13 +123,74 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function requestPairingCodeWithRetry(sock, number, maxAttempts = 3) {
+function isOwner(jid = '') {
+  const sender = normalizeNumber(jid);
+  if (!sender) return false;
+  const owner = normalizeNumber(settings.ownerNumber || '');
+  const bot = normalizeNumber(settings.botNumber || '');
+  return sender === owner || sender === bot;
+}
+
+async function getPairingMode() {
+  const saved = String(settings.pairingMode || 'codigo').toLowerCase();
+
+  if (pairPromptInProgress) return saved === 'qr' ? 'qr' : 'codigo';
+
+  pairPromptInProgress = true;
+  try {
+    const input = await askQuestion(
+      `Modo de vinculacion [codigo/qr] (actual ${saved}, Enter para usarlo): `
+    );
+    const normalized = String(input || '').trim().toLowerCase();
+    const mode = normalized || saved;
+    const finalMode = mode === 'qr' ? 'qr' : 'codigo';
+
+    settings = saveSettings({
+      ...settings,
+      pairingMode: finalMode,
+    });
+
+    return finalMode;
+  } finally {
+    pairPromptInProgress = false;
+  }
+}
+
+async function getPairingTargetNumber() {
+  const savedNumber = normalizeNumber(settings.botNumber || '');
+
+  if (pairPromptInProgress) {
+    return savedNumber;
+  }
+
+  pairPromptInProgress = true;
+  try {
+    const promptLabel = savedNumber
+      ? `Numero para vincular (actual ${savedNumber}, Enter para usarlo): `
+      : 'Numero para vincular (ej: 51912345678): ';
+
+    const input = await askQuestion(promptLabel);
+    const parsed = String(input || '').replace(/\D/g, '') || savedNumber;
+    if (!parsed) throw new Error('Numero invalido.');
+
+    settings = saveSettings({
+      ...settings,
+      botNumber: parsed,
+      ownerNumber: normalizeNumber(settings.ownerNumber || '') || parsed,
+    });
+
+    return parsed;
+  } finally {
+    pairPromptInProgress = false;
+  }
+}
+
+async function requestPairingCodeWithRetry(sock, number, maxAttempts = 8) {
   let lastError = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      // Small delay after connection lifecycle events improves reliability on some forks.
-      await delay(1300 * attempt);
+      await delay(1000 * attempt);
       const code = await sock.requestPairingCode(number);
       return code;
     } catch (error) {
@@ -209,139 +202,175 @@ async function requestPairingCodeWithRetry(sock, number, maxAttempts = 3) {
         statusCode === 408 ||
         /Connection Closed|Precondition Required|closed/i.test(String(error?.message || ''));
 
-      if (!canRetry || attempt >= maxAttempts) {
-        break;
-      }
+      if (!canRetry || attempt >= maxAttempts) break;
 
       console.log(`Pairing intento ${attempt} fallo (${statusCode || 'sin-codigo'}). Reintentando...`);
-      await delay(1800 * attempt);
+      await delay(1500 * attempt);
     }
   }
 
   throw lastError || new Error('No pude obtener codigo de vinculacion.');
 }
 
-async function startBot() {
-  console.log(buildBanner());
-  reloadCommands();
+function scheduleReconnect() {
+  if (reconnectTimer) return;
 
-  const authFolder = String(settings.authFolder || 'auth_info_baileys').trim() || 'auth_info_baileys';
-  const prefix = String(settings.prefix || '.').trim() || '.';
-  const { state, saveCreds } = await useMultiFileAuthState(authFolder);
-  const { version } = await fetchLatestBaileysVersion();
-
-  pairingCodePrinted = false;
-  if (!state?.creds?.registered) {
-    try {
-      currentPairingMode = await getPairingMode();
-      console.log(`Modo de vinculacion activo: ${currentPairingMode.toUpperCase()}`);
-      if (currentPairingMode === 'codigo') {
-        targetPairingNumber = await getPairingTargetNumber();
-        console.log(`Numero objetivo para vinculacion: ${targetPairingNumber}`);
-      } else {
-        targetPairingNumber = '';
-      }
-    } catch (error) {
-      console.log(`No pude preparar vinculacion: ${String(error?.message || error)}`);
-    }
-  }
-
-  const sock = makeWASocket({
-    version,
-    printQRInTerminal: !state?.creds?.registered && currentPairingMode === 'qr',
-    logger: pino({ level: 'silent' }),
-    auth: state,
-    browser: ['HIYUKI BOT', 'Chrome', '1.0.0'],
-  });
-  activeSocket = sock;
-  pairingRequestedForCurrentSocket = false;
-
-  sock.ev.on('creds.update', saveCreds);
-
-  sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
-    if (
-      connection === 'open' &&
-      currentPairingMode === 'codigo' &&
-      !sock.authState.creds.registered &&
-      !pairingCodePrinted &&
-      !pairingInProgress &&
-      targetPairingNumber
-    ) {
-      pairingRequestedForCurrentSocket = true;
-      pairingInProgress = true;
-      try {
-        const code = await requestPairingCodeWithRetry(sock, targetPairingNumber, 8);
-        pairingCodePrinted = true;
-        console.log('========================================');
-        console.log('CODIGO DE VINCULACION (NUMERO)');
-        console.log(`Numero: ${targetPairingNumber}`);
-        console.log(`Codigo: ${code}`);
-        console.log('========================================');
-        console.log('WhatsApp > Dispositivos vinculados > Vincular con numero');
-      } catch (error) {
-        console.log('No pude generar codigo por numero en este intento.');
-        console.log(`Detalle: ${String(error?.message || error)}`);
-        console.log('Si persiste, reinicia y usa modo QR temporalmente.');
-      } finally {
-        pairingInProgress = false;
-      }
-    }
-
-    if (connection === 'open') {
-      console.log('Bot conectado.');
-      reconnectAttempts = 0;
-      return;
-    }
-
-    if (connection === 'connecting' && !sock.authState.creds.registered && currentPairingMode === 'qr') {
-      console.log('Esperando escaneo QR desde WhatsApp...');
-    }
-
-    if (connection === 'close') {
-      const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
-      if (statusCode === 401 && !sock.authState?.creds?.registered) {
-        console.log('Detecte 401 antes de vincular. Limpio auth y reintento automaticamente...');
-        clearAuthFolder(authFolder);
-        pairingRequestedForCurrentSocket = false;
-        pairingCodePrinted = false;
-      }
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-      if (shouldReconnect) scheduleReconnect();
-      return;
-    }
-  });
-
-  sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    if (type !== 'notify') return;
-    const m = messages?.[0];
-    if (!m || m.key.fromMe) return;
-
-    const body = getMessageText(m).trim();
-    if (!body.startsWith(prefix)) return;
-
-    const args = body.slice(prefix.length).trim().split(/\s+/);
-    const commandName = String(args.shift() || '').toLowerCase();
-    const cmd = global.comandos?.get(commandName);
-    if (!cmd) return;
-
-    const from = m.key.remoteJid;
-    const sender = m.key.participant || from;
-
-    if (cmd.isOwner && !isOwner(sender)) {
-      await sock.sendMessage(from, { text: 'Solo el owner puede usar este comando.' }, { quoted: m });
-      return;
-    }
-
-    await cmd.run(sock, m, args, from, isOwner(sender), {
-      settings,
-      saveSettings: (patch = {}) => {
-        settings = saveSettings({ ...settings, ...(patch || {}) });
-        return settings;
-      },
-      prefix,
-      axios,
-    });
-  });
+  reconnectAttempts += 1;
+  const waitMs = Math.min(15000, 2000 + reconnectAttempts * 1200);
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    startBot().catch((err) => console.error('Error reiniciando bot:', err));
+  }, waitMs);
 }
 
-startBot().catch((err) => console.error('Error iniciando bot:', err));
+async function startBot() {
+  if (startupRunning) return;
+  startupRunning = true;
+  sessionToken += 1;
+  const localToken = sessionToken;
+
+  try {
+    if (!bannerPrinted) {
+      bannerPrinted = true;
+      console.log(buildBanner());
+    }
+
+    reloadCommands();
+
+    const authFolder = String(settings.authFolder || 'auth_info_baileys').trim() || 'auth_info_baileys';
+    const prefix = String(settings.prefix || '.').trim() || '.';
+    ensureDir(authFolder);
+
+    const { state, saveCreds } = await useMultiFileAuthState(authFolder);
+    const { version } = await fetchLatestBaileysVersion();
+
+    let pairingMode = String(settings.pairingMode || 'codigo').toLowerCase();
+    let pairingNumber = '';
+
+    if (!state?.creds?.registered) {
+      pairingMode = await getPairingMode();
+      console.log(`Modo de vinculacion activo: ${pairingMode.toUpperCase()}`);
+
+      if (pairingMode === 'codigo') {
+        pairingNumber = await getPairingTargetNumber();
+        console.log(`Numero objetivo para vinculacion: ${pairingNumber}`);
+      } else {
+        console.log('Escanea el QR dentro de los proximos 30 segundos.');
+      }
+    }
+
+    const sock = makeWASocket({
+      version,
+      printQRInTerminal: !state?.creds?.registered && pairingMode === 'qr',
+      logger: pino({ level: 'silent' }),
+      auth: state,
+      browser: ['HIYUKI BOT', 'Chrome', '1.0.0'],
+    });
+
+    sock.ev.on('creds.update', saveCreds);
+
+    let codeDelivered = false;
+    let codeRequestRunning = false;
+
+    sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
+      if (localToken !== sessionToken) return;
+
+      if (
+        connection === 'open' &&
+        pairingMode === 'codigo' &&
+        !sock.authState.creds.registered &&
+        pairingNumber &&
+        !codeDelivered &&
+        !codeRequestRunning
+      ) {
+        codeRequestRunning = true;
+        try {
+          const code = await requestPairingCodeWithRetry(sock, pairingNumber, 8);
+          codeDelivered = true;
+          console.log('========================================');
+          console.log('CODIGO DE VINCULACION (NUMERO)');
+          console.log(`Numero: ${pairingNumber}`);
+          console.log(`Codigo: ${code}`);
+          console.log('========================================');
+          console.log('WhatsApp > Dispositivos vinculados > Vincular con numero');
+        } catch (error) {
+          console.log('No pude generar codigo por numero en este intento.');
+          console.log(`Detalle: ${String(error?.message || error)}`);
+          console.log('Si persiste, reinicia y usa modo qr.');
+          codeDelivered = false;
+        } finally {
+          codeRequestRunning = false;
+        }
+      }
+
+      if (connection === 'open') {
+        reconnectAttempts = 0;
+        console.log('Bot conectado correctamente.');
+        writeConnectedState({
+          connected: true,
+          connectedAt: Date.now(),
+          mode: pairingMode,
+          botNumber: normalizeNumber(settings.botNumber || ''),
+        });
+        return;
+      }
+
+      if (connection === 'connecting' && !sock.authState.creds.registered && pairingMode === 'qr') {
+        console.log('Esperando escaneo QR desde WhatsApp...');
+      }
+
+      if (connection === 'close') {
+        const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode || 0;
+
+        if (statusCode === 401 && !sock.authState?.creds?.registered) {
+          console.log('Detecte 401 antes de vincular. Limpio auth y reintento automaticamente...');
+          clearAuthFolder(authFolder);
+        }
+
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        if (shouldReconnect) scheduleReconnect();
+      }
+    });
+
+    sock.ev.on('messages.upsert', async ({ messages, type }) => {
+      if (localToken !== sessionToken) return;
+      if (type !== 'notify') return;
+
+      const m = messages?.[0];
+      if (!m || m.key.fromMe) return;
+
+      const body = getMessageText(m).trim();
+      if (!body.startsWith(prefix)) return;
+
+      const args = body.slice(prefix.length).trim().split(/\s+/);
+      const commandName = String(args.shift() || '').toLowerCase();
+      const cmd = global.comandos?.get(commandName);
+      if (!cmd) return;
+
+      const from = m.key.remoteJid;
+      const sender = m.key.participant || from;
+
+      if (cmd.isOwner && !isOwner(sender)) {
+        await sock.sendMessage(from, { text: 'Solo el owner puede usar este comando.' }, { quoted: m });
+        return;
+      }
+
+      await cmd.run(sock, m, args, from, isOwner(sender), {
+        settings,
+        saveSettings: (patch = {}) => {
+          settings = saveSettings({ ...settings, ...(patch || {}) });
+          return settings;
+        },
+        prefix,
+        axios,
+      });
+    });
+  } catch (err) {
+    console.error('Error iniciando bot:', err);
+    scheduleReconnect();
+  } finally {
+    startupRunning = false;
+  }
+}
+
+startBot().catch((err) => console.error('Error fatal:', err));
