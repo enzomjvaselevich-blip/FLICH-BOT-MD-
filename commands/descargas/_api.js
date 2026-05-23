@@ -43,6 +43,37 @@ function toAbsoluteUrl(rawUrl = '', baseUrl = 'https://dv-yer-api.online') {
   return value;
 }
 
+function extractMediaCandidates(result = {}, baseUrl = 'https://dv-yer-api.online') {
+  const raw = [
+    result?.download_url_full,
+    result?.stream_url_full,
+    result?.provider_direct_url,
+    result?.direct_url,
+    result?.download_url,
+    result?.stream_url,
+    result?.url,
+    result?.download,
+    result?.audio,
+    result?.video,
+    result?.dl,
+    result?.link,
+    result?.media,
+    result?.nowm,
+    result?.nowatermark,
+    result?.hd,
+    result?.sd,
+  ];
+  const out = [];
+  const seen = new Set();
+  for (const item of raw) {
+    const abs = toAbsoluteUrl(item, baseUrl);
+    if (!abs || seen.has(abs)) continue;
+    seen.add(abs);
+    out.push(abs);
+  }
+  return out;
+}
+
 async function callApi(ctx = {}, endpoint = '', params = {}) {
   const axios = ctx?.axios;
   const settings = ctx?.settings || {};
@@ -65,6 +96,7 @@ async function callApi(ctx = {}, endpoint = '', params = {}) {
 module.exports = {
   callApi,
   extractMediaUrl,
+  extractMediaCandidates,
   extractTitle,
   toAbsoluteUrl,
 };

@@ -1,4 +1,4 @@
-const { callApi, extractMediaUrl } = require('./_api');
+const { callApi, extractMediaCandidates, extractTitle } = require('./_api');
 
 module.exports = {
   command: ['tiktok', 'tt'],
@@ -11,17 +11,36 @@ module.exports = {
       return;
     }
 
-    await client.sendMessage(from, { text: 'Procesando TikTok...' }, { quoted: m });
+    await client.sendMessage(from, {
+      text: '╭━━━〔 TIKTOK 〕━━⬣\n┃ ⏳ Procesando enlace...\n╰━━━━━━━━━━━━━━⬣',
+    }, { quoted: m });
 
     try {
-      const result = await callApi(ctx, 'tiktok', { url: link });
-      const mediaUrl = extractMediaUrl(result);
-      if (!mediaUrl) {
+      const result = await callApi(ctx, 'ttdlmp4', { url: link, mode: 'link' });
+      const title = extractTitle(result, 'TikTok Video');
+      const mediaUrls = extractMediaCandidates(result);
+
+      if (!mediaUrls.length) {
         await client.sendMessage(from, { text: 'La API no devolvio video de TikTok.' }, { quoted: m });
         return;
       }
 
-      await client.sendMessage(from, { video: { url: mediaUrl }, caption: 'TikTok descargado' }, { quoted: m });
+      let sent = false;
+      let lastError = '';
+      for (const mediaUrl of mediaUrls) {
+        try {
+          await client.sendMessage(from, {
+            video: { url: mediaUrl },
+            caption: `✅ TikTok descargado\n🎬 ${title}`,
+          }, { quoted: m });
+          sent = true;
+          break;
+        } catch (e) {
+          lastError = String(e?.message || e);
+        }
+      }
+
+      if (!sent) throw new Error(lastError || 'No pude enviar el video de TikTok.');
     } catch (error) {
       await client.sendMessage(from, { text: `Error en .tiktok: ${String(error?.message || error)}` }, { quoted: m });
     }

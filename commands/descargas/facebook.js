@@ -1,4 +1,4 @@
-const { callApi, extractMediaUrl } = require('./_api');
+const { callApi, extractMediaCandidates, extractTitle } = require('./_api');
 
 module.exports = {
   command: ['facebook', 'fb'],
@@ -11,17 +11,36 @@ module.exports = {
       return;
     }
 
-    await client.sendMessage(from, { text: 'Procesando Facebook...' }, { quoted: m });
+    await client.sendMessage(from, {
+      text: '╭━━━〔 FACEBOOK 〕━━⬣\n┃ ⏳ Preparando descarga...\n╰━━━━━━━━━━━━━━━━━━⬣',
+    }, { quoted: m });
 
     try {
-      const result = await callApi(ctx, 'facebook', { url: link });
-      const mediaUrl = extractMediaUrl(result);
-      if (!mediaUrl) {
+      const result = await callApi(ctx, 'facebook', { url: link, mode: 'link', quality: 'hd' });
+      const title = extractTitle(result, 'Facebook Video');
+      const mediaUrls = extractMediaCandidates(result);
+
+      if (!mediaUrls.length) {
         await client.sendMessage(from, { text: 'La API no devolvio video de Facebook.' }, { quoted: m });
         return;
       }
 
-      await client.sendMessage(from, { video: { url: mediaUrl }, caption: 'Facebook descargado' }, { quoted: m });
+      let sent = false;
+      let lastError = '';
+      for (const mediaUrl of mediaUrls) {
+        try {
+          await client.sendMessage(from, {
+            video: { url: mediaUrl },
+            caption: `✅ Facebook descargado\n🎬 ${title}`,
+          }, { quoted: m });
+          sent = true;
+          break;
+        } catch (e) {
+          lastError = String(e?.message || e);
+        }
+      }
+
+      if (!sent) throw new Error(lastError || 'No pude enviar el video de Facebook.');
     } catch (error) {
       await client.sendMessage(from, { text: `Error en .facebook: ${String(error?.message || error)}` }, { quoted: m });
     }

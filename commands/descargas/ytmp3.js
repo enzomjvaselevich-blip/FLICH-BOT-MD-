@@ -44,7 +44,14 @@ module.exports = {
       return;
     }
 
-    await client.sendMessage(from, { text: 'Procesando MP3...' }, { quoted: m });
+    await client.sendMessage(from, {
+      text:
+`╔══════════════════════╗
+║   HIYUKI MP3 ENGINE  ║
+╚══════════════════════╝
+🔎 Buscando audio...
+⏳ Preparando descarga MP3`,
+    }, { quoted: m });
 
     try {
       let targetUrl = query;
@@ -82,6 +89,9 @@ module.exports = {
             audio: { url },
             mimetype: 'audio/mpeg',
             fileName: `${title}.mp3`,
+          }, { quoted: m });
+          await client.sendMessage(from, {
+            text: `✅ MP3 enviado correctamente\n🎵 ${title}`,
           }, { quoted: m });
           sent = true;
           break;

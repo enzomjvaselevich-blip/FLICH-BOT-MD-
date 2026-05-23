@@ -1,4 +1,4 @@
-const { callApi, extractMediaUrl } = require('./_api');
+const { callApi, extractMediaCandidates, extractTitle } = require('./_api');
 
 module.exports = {
   command: ['instagram', 'ig'],
@@ -11,17 +11,36 @@ module.exports = {
       return;
     }
 
-    await client.sendMessage(from, { text: 'Procesando Instagram...' }, { quoted: m });
+    await client.sendMessage(from, {
+      text: '╭━━━〔 INSTAGRAM 〕━━⬣\n┃ ⏳ Procesando publicacion...\n╰━━━━━━━━━━━━━━━━━━━⬣',
+    }, { quoted: m });
 
     try {
-      const result = await callApi(ctx, 'instagram', { url: link });
-      const mediaUrl = extractMediaUrl(result);
-      if (!mediaUrl) {
+      const result = await callApi(ctx, 'instagram', { url: link, mode: 'link', pick: 1, lang: 'es' });
+      const title = extractTitle(result, 'Instagram Media');
+      const mediaUrls = extractMediaCandidates(result);
+
+      if (!mediaUrls.length) {
         await client.sendMessage(from, { text: 'La API no devolvio media de Instagram.' }, { quoted: m });
         return;
       }
 
-      await client.sendMessage(from, { video: { url: mediaUrl }, caption: 'Instagram descargado' }, { quoted: m });
+      let sent = false;
+      let lastError = '';
+      for (const mediaUrl of mediaUrls) {
+        try {
+          await client.sendMessage(from, {
+            video: { url: mediaUrl },
+            caption: `✅ Instagram descargado\n🎬 ${title}`,
+          }, { quoted: m });
+          sent = true;
+          break;
+        } catch (e) {
+          lastError = String(e?.message || e);
+        }
+      }
+
+      if (!sent) throw new Error(lastError || 'No pude enviar el video de Instagram.');
     } catch (error) {
       await client.sendMessage(from, { text: `Error en .instagram: ${String(error?.message || error)}` }, { quoted: m });
     }

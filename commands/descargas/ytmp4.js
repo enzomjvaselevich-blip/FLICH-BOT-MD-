@@ -14,7 +14,14 @@ module.exports = {
       return;
     }
 
-    await client.sendMessage(from, { text: 'Buscando video de YouTube...' }, { quoted: m });
+    await client.sendMessage(from, {
+      text:
+`╔══════════════════════╗
+║   HIYUKI MP4 ENGINE  ║
+╚══════════════════════╝
+🔎 Buscando video...
+⏳ Preparando descarga MP4`,
+    }, { quoted: m });
 
     try {
       const axios = ctx?.axios;
@@ -51,7 +58,7 @@ module.exports = {
 
       await client.sendMessage(from, {
         video: { url: mediaUrl },
-        caption: `Listo: ${title}`,
+        caption: `✅ MP4 enviado correctamente\n🎬 ${title}`,
       }, { quoted: m });
     } catch (error) {
       await client.sendMessage(from, { text: `Error en .ytmp4: ${String(error?.message || error)}` }, { quoted: m });
