@@ -8,9 +8,10 @@ module.exports = {
     const owner = String(settings.ownerNumber || '51907376960');
     const apiReady = Boolean(String(settings.apiBaseUrl || '').trim() && String(settings.apiKey || '').trim());
     const lines = [
-      '╔════════════════════════════╗',
-      '║      *HIYUKI-BOT*  華      ║',
-      '╚════════════════════════════╝',
+      '╔═━────━━─━═━────━━─━═╗',
+      '║      *HIYUKI-BOT* 華       ║',
+      '╚═━────━━─━═━────━━─━═╝',
+      '⟡ _Power • Elegance • Speed_ ⟡',
       '',
       '┌─ 〘 *ESTADO* 〙',
       `│ ✦ Prefix: \`${prefix}\``,
@@ -32,12 +33,20 @@ module.exports = {
       `│ • \`${prefix}mediafire <link>\``,
       '└──────────────',
       '',
+      '┌─ 〘 *SISTEMA* 〙',
+      `│ • \`${prefix}infobot\``,
+      `│ • \`${prefix}hora\``,
+      `│ • \`${prefix}sistema\``,
+      `│ • \`${prefix}speed\``,
+      '└──────────────',
+      '',
       '┌─ 〘 *OWNER* 〙',
       `│ • \`${prefix}update\``,
       `│ • \`${prefix}setapi auto\``,
       '└──────────────',
       '',
       '✧ _Respuesta rápida, estable y elegante_ ✧',
+      '❖ _Tip:_ usa *play* para selector de MP3/MP4',
     ];
 
     const menuVideo = 'https://raw.githubusercontent.com/DevYerZx/Hiyuki-Bot/main/videos-imagenes/menu.mp4';
