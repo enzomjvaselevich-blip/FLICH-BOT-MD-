@@ -39,6 +39,7 @@ const DEFAULT_SETTINGS = {
   apiKey: 'dvyer911840240197',
   antiPrivate: false,
   groupOptions: {},
+  antiLinkWarnings: {},
 };
 const RUNTIME_DIR = path.join(process.cwd(), 'runtime');
 const CONNECTED_FILE = path.join(RUNTIME_DIR, 'connected.json');
@@ -114,6 +115,13 @@ function getGroupOptions(chatId = '') {
     ? settings.groupOptions
     : {};
   return all[chatId] || {};
+}
+
+function normalizeUserJid(jid = '') {
+  const user = String(jid || '').split(':')[0];
+  if (!user) return '';
+  if (user.endsWith('@s.whatsapp.net')) return user;
+  return `${user.replace(/@.+$/, '')}@s.whatsapp.net`;
 }
 
 function getMessageText(msg = {}) {
@@ -314,10 +322,47 @@ async function startBot() {
 
       if (!isGroup && settings.antiPrivate && !isOwner(sender)) return;
 
-      if (isGroup && groupOpts.antilink && /(https?:\/\/|wa\.me\/|chat\.whatsapp\.com\/)/i.test(body)) {
+      if (isGroup && groupOpts.antilink && /(chat\.whatsapp\.com\/|whatsapp\.com\/channel\/)/i.test(body)) {
         if (!isOwner(sender) && !senderIsAdmin) {
+          const userJid = normalizeUserJid(sender);
+          const allWarns = settings?.antiLinkWarnings && typeof settings.antiLinkWarnings === 'object'
+            ? settings.antiLinkWarnings
+            : {};
+          const groupWarns = allWarns[from] && typeof allWarns[from] === 'object' ? allWarns[from] : {};
+          const current = Number(groupWarns[userJid] || 0);
+          const next = current + 1;
+          groupWarns[userJid] = next;
+          allWarns[from] = groupWarns;
+          saveSettings({ antiLinkWarnings: allWarns });
+
           try { await sock.sendMessage(from, { delete: m.key }); } catch {}
-          await sock.sendMessage(from, { text: `⚠️ @${normalizeNumber(sender)} enlaces no permitidos.`, mentions: [sender] }, { quoted: m });
+
+          if (next >= 3) {
+            delete groupWarns[userJid];
+            allWarns[from] = groupWarns;
+            saveSettings({ antiLinkWarnings: allWarns });
+
+            await sock.sendMessage(
+              from,
+              {
+                text: `🚫 @${normalizeNumber(sender)} alcanzó *3/3 advertencias* por enlaces de WhatsApp y será expulsado.`,
+                mentions: [sender],
+              },
+              { quoted: m }
+            );
+            try {
+              await sock.groupParticipantsUpdate(from, [userJid], 'remove');
+            } catch {}
+          } else {
+            await sock.sendMessage(
+              from,
+              {
+                text: `⚠️ @${normalizeNumber(sender)} enlace de WhatsApp detectado.\nAdvertencia: *${next}/3*`,
+                mentions: [sender],
+              },
+              { quoted: m }
+            );
+          }
           return;
         }
       }

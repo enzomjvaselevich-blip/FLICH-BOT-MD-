@@ -18,6 +18,10 @@ module.exports = {
     all[from] = { ...current, antilink: enabled };
     ctx.saveSettings({ groupOptions: all });
 
-    await client.sendMessage(from, { text: `✅ AntiLink ${enabled ? 'activado' : 'desactivado'} en este grupo.` }, { quoted: m });
+    await client.sendMessage(from, {
+      text: enabled
+        ? '✅ *AntiLink ACTIVADO*\n_Se borran enlaces de grupos/canales de WhatsApp._\n_3 advertencias = expulsión automática._\n_Admins/owner/bot están exentos._'
+        : '✅ *AntiLink DESACTIVADO*',
+    }, { quoted: m });
   },
 };
