@@ -97,6 +97,7 @@ let reconnectAttempts = 0;
 let activeSocket = null;
 let pairingInProgress = false;
 let pairingRequestedForCurrentSocket = false;
+let targetPairingNumber = '';
 
 async function getPairingTargetNumber() {
   const savedNumber = normalizeNumber(settings.botNumber || '');
@@ -200,6 +201,15 @@ async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState(authFolder);
   const { version } = await fetchLatestBaileysVersion();
 
+  if (!state?.creds?.registered && !targetPairingNumber) {
+    try {
+      targetPairingNumber = await getPairingTargetNumber();
+      console.log(`Numero objetivo para vinculacion: ${targetPairingNumber}`);
+    } catch (error) {
+      console.log(`No pude leer numero para vinculacion: ${String(error?.message || error)}`);
+    }
+  }
+
   const sock = makeWASocket({
     version,
     printQRInTerminal: true,
@@ -216,12 +226,16 @@ async function startBot() {
     if (connection === 'open') {
       console.log('Bot conectado.');
       reconnectAttempts = 0;
-      if (!sock.authState.creds.registered && !pairingRequestedForCurrentSocket && !pairingInProgress) {
+      if (
+        !sock.authState.creds.registered &&
+        !pairingRequestedForCurrentSocket &&
+        !pairingInProgress &&
+        targetPairingNumber
+      ) {
         pairingRequestedForCurrentSocket = true;
         pairingInProgress = true;
         try {
-          const number = await getPairingTargetNumber();
-          const code = await requestPairingCodeWithRetry(sock, number, 4);
+          const code = await requestPairingCodeWithRetry(sock, targetPairingNumber, 4);
           console.log(`Codigo de vinculacion: ${code}`);
           console.log('WhatsApp > Dispositivos vinculados > Vincular con numero');
         } catch (error) {
@@ -241,6 +255,7 @@ async function startBot() {
       if (statusCode === 401 && !sock.authState?.creds?.registered) {
         console.log('Detecte 401 antes de vincular. Limpio auth y reintento automaticamente...');
         clearAuthFolder(authFolder);
+        pairingRequestedForCurrentSocket = false;
       }
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
       if (shouldReconnect) scheduleReconnect();
