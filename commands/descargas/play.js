@@ -6,6 +6,12 @@ function shortText(text = '', max = 55) {
   if (t.length <= max) return t;
   return `${t.slice(0, max - 1)}...`;
 }
+function formatDuration(seconds = 0) {
+  const total = Math.max(0, Number(seconds || 0));
+  const m = Math.floor(total / 60);
+  const s = Math.floor(total % 60);
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
 
 module.exports = {
   command: ['play'],
@@ -49,13 +55,13 @@ module.exports = {
       const rowsMp3 = top.map((item, i) => ({
         header: '🎵',
         title: `${i + 1}. ${shortText(item?.title || 'Sin titulo')}`,
-        description: `${shortText(item?.channel || 'Canal desconocido', 28)} | ${item?.duration_seconds || 0}s`,
+        description: `Canal: ${shortText(item?.channel || 'Canal desconocido', 20)} • ${formatDuration(item?.duration_seconds || 0)} • MP3`,
         id: `${prefix}ytmp3 ${item.url}`,
       }));
       const rowsMp4 = top.map((item, i) => ({
         header: '🎬',
         title: `${i + 1}. ${shortText(item?.title || 'Sin titulo')}`,
-        description: `${shortText(item?.channel || 'Canal desconocido', 28)} | ${item?.duration_seconds || 0}s`,
+        description: `Canal: ${shortText(item?.channel || 'Canal desconocido', 20)} • ${formatDuration(item?.duration_seconds || 0)} • MP4`,
         id: `${prefix}ytmp4 ${item.url}`,
       }));
       const sections = [
@@ -72,21 +78,28 @@ module.exports = {
       ];
 
       const landingText =
-`Resultados para: ${query}
-Pulsa *ELEGIR CANCION* y toca la opcion que quieras.
-Se descarga MP3 directo sin escribir mas.`;
+`╔══════════════════════════╗
+║      HIYUKI PLAY HUB     ║
+╚══════════════════════════╝
+
+🔎 Busqueda: *${query}*
+🎛️ Modo: *Selector interactivo*
+
+Pulsa *ELEGIR CANCION* y selecciona:
+• 🎧 MP3 para audio
+• 🎥 MP4 para video`;
 
       const payload = {
         footer: 'HIYUKI-BOT',
         buttons: [
           {
             buttonId: 'play_select_open',
-            buttonText: { displayText: '🎵 ELEGIR CANCION' },
+            buttonText: { displayText: '☷ ELEGIR CANCION' },
             type: 4,
             nativeFlowInfo: {
               name: 'single_select',
               paramsJson: JSON.stringify({
-                title: 'HIYUKI PLAY SELECTOR',
+                title: '🎼 HIYUKI SELECTOR',
                 sections,
               }),
             },
@@ -107,10 +120,16 @@ Se descarga MP3 directo sin escribir mas.`;
         await client.sendMessage(from, payload, { quoted: m });
       } catch {
         await client.sendMessage(from, {
-          text: `Resultados para: ${query}\nToca una opcion para descargar MP3 o MP4.`,
+          text:
+`╔══════════════════════════╗
+║      HIYUKI PLAY HUB     ║
+╚══════════════════════════╝
+
+🔎 Busqueda: *${query}*
+Toca una opcion para descargar *MP3* o *MP4*.`,
           footer: 'HIYUKI-BOT',
-          title: 'Selector de canciones',
-          buttonText: 'Elegir cancion',
+          title: '🎼 Selector de canciones',
+          buttonText: '☷ Elegir cancion',
           sections: [
             { title: 'Descargar MP3', rows: rowsMp3.map((r) => ({ title: r.title, description: r.description, rowId: r.id })) },
             { title: 'Descargar MP4', rows: rowsMp4.map((r) => ({ title: r.title, description: r.description, rowId: r.id })) },
