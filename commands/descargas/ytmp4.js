@@ -1,4 +1,4 @@
-const { extractMediaUrl, extractTitle } = require('./_api');
+const { extractMediaUrl, extractTitle, toAbsoluteUrl } = require('./_api');
 function isYouTubeUrl(text = '') {
   return /(?:youtu\.be\/|youtube\.com\/)/i.test(String(text || ''));
 }
@@ -41,7 +41,7 @@ module.exports = {
         timeout: 60000,
       });
       const result = response?.data?.result || response?.data?.data || response?.data || {};
-      const mediaUrl = extractMediaUrl(result);
+      const mediaUrl = toAbsoluteUrl(extractMediaUrl(result), apiBase);
       const title = extractTitle(result, query);
 
       if (!mediaUrl) {

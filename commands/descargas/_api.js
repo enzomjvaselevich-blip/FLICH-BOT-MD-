@@ -35,6 +35,14 @@ function extractTitle(result = {}, fallback = 'archivo') {
   ]);
 }
 
+function toAbsoluteUrl(rawUrl = '', baseUrl = 'https://dv-yer-api.online') {
+  const value = String(rawUrl || '').trim();
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith('/')) return `${String(baseUrl).replace(/\/$/, '')}${value}`;
+  return value;
+}
+
 async function callApi(ctx = {}, endpoint = '', params = {}) {
   const axios = ctx?.axios;
   const settings = ctx?.settings || {};
@@ -58,4 +66,5 @@ module.exports = {
   callApi,
   extractMediaUrl,
   extractTitle,
+  toAbsoluteUrl,
 };
