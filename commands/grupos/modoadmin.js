@@ -18,6 +18,10 @@ module.exports = {
     all[from] = { ...current, modoadmin: enabled };
     ctx.saveSettings({ groupOptions: all });
 
-    await client.sendMessage(from, { text: `✅ Modo admin ${enabled ? 'activado' : 'desactivado'}.` }, { quoted: m });
+    await client.sendMessage(from, {
+      text: enabled
+        ? '✅ *Modo Admin ACTIVADO*\n_Desde ahora solo admins, owner y bot pueden usar comandos._'
+        : '✅ *Modo Admin DESACTIVADO*\n_Ahora todos los miembros pueden usar comandos de nuevo._',
+    }, { quoted: m });
   },
 };

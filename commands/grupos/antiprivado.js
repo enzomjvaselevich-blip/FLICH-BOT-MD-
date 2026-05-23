@@ -12,6 +12,10 @@ module.exports = {
 
     const enabled = mode === 'on' || mode === '1';
     ctx.saveSettings({ antiPrivate: enabled });
-    await client.sendMessage(from, { text: `✅ Anti-privado ${enabled ? 'activado' : 'desactivado'}.` }, { quoted: m });
+    await client.sendMessage(from, {
+      text: enabled
+        ? '✅ *Anti-Privado ACTIVADO*\n_El bot ignorará mensajes privados de usuarios normales._\n_Solo owner/bot quedan permitidos._'
+        : '✅ *Anti-Privado DESACTIVADO*\n_El bot vuelve a responder en privado._',
+    }, { quoted: m });
   },
 };

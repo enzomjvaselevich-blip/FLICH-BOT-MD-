@@ -312,10 +312,7 @@ async function startBot() {
         } catch {}
       }
 
-      if (!isGroup && settings.antiPrivate && !isOwner(sender)) {
-        await sock.sendMessage(from, { text: '🚫 Anti-privado activo. Usa comandos solo en grupos autorizados.' }, { quoted: m });
-        return;
-      }
+      if (!isGroup && settings.antiPrivate && !isOwner(sender)) return;
 
       if (isGroup && groupOpts.antilink && /(https?:\/\/|wa\.me\/|chat\.whatsapp\.com\/)/i.test(body)) {
         if (!isOwner(sender) && !senderIsAdmin) {
@@ -370,7 +367,6 @@ async function startBot() {
       }
 
       if (isGroup && groupOpts.modoadmin && !isOwner(sender) && !senderIsAdmin) {
-        await sock.sendMessage(from, { text: '🚫 Modo admin activo. Solo administradores pueden usar comandos.' }, { quoted: m });
         return;
       }
 
