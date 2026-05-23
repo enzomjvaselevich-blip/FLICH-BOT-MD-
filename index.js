@@ -96,6 +96,7 @@ let reconnectTimer = null;
 let reconnectAttempts = 0;
 let activeSocket = null;
 let pairingInProgress = false;
+let pairingRequestedForCurrentSocket = false;
 
 async function getPairingTargetNumber() {
   const savedNumber = normalizeNumber(settings.botNumber || '');
@@ -162,44 +163,13 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function waitForConnectionOpen(sock, timeoutMs = 25000) {
-  return new Promise((resolve, reject) => {
-    let done = false;
-    const timer = setTimeout(() => {
-      if (done) return;
-      done = true;
-      reject(new Error('Timeout esperando conexion abierta.'));
-    }, Math.max(5000, Number(timeoutMs || 25000)));
-
-    const onUpdate = ({ connection, lastDisconnect }) => {
-      if (done) return;
-      if (connection === 'open') {
-        done = true;
-        clearTimeout(timer);
-        sock.ev.off('connection.update', onUpdate);
-        resolve(true);
-        return;
-      }
-
-      if (connection === 'close') {
-        const code = new Boom(lastDisconnect?.error)?.output?.statusCode || 0;
-        done = true;
-        clearTimeout(timer);
-        sock.ev.off('connection.update', onUpdate);
-        reject(new Error(`Conexion cerrada mientras esperaba open (${code})`));
-      }
-    };
-
-    sock.ev.on('connection.update', onUpdate);
-  });
-}
-
 async function requestPairingCodeWithRetry(sock, number, maxAttempts = 3) {
   let lastError = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      await waitForConnectionOpen(sock, 30000);
+      // Small delay after connection lifecycle events improves reliability on some forks.
+      await delay(1300 * attempt);
       const code = await sock.requestPairingCode(number);
       return code;
     } catch (error) {
@@ -238,6 +208,7 @@ async function startBot() {
     browser: ['HIYUKI BOT', 'Chrome', '1.0.0'],
   });
   activeSocket = sock;
+  pairingRequestedForCurrentSocket = false;
 
   sock.ev.on('creds.update', saveCreds);
 
@@ -245,6 +216,23 @@ async function startBot() {
     if (connection === 'open') {
       console.log('Bot conectado.');
       reconnectAttempts = 0;
+      if (!sock.authState.creds.registered && !pairingRequestedForCurrentSocket && !pairingInProgress) {
+        pairingRequestedForCurrentSocket = true;
+        pairingInProgress = true;
+        try {
+          const number = await getPairingTargetNumber();
+          const code = await requestPairingCodeWithRetry(sock, number, 4);
+          console.log(`Codigo de vinculacion: ${code}`);
+          console.log('WhatsApp > Dispositivos vinculados > Vincular con numero');
+        } catch (error) {
+          console.log('No pude generar codigo por numero en este intento.');
+          console.log(`Detalle: ${String(error?.message || error)}`);
+          console.log('Fallback activo: escanea el QR en consola para vincular.');
+          pairingRequestedForCurrentSocket = false;
+        } finally {
+          pairingInProgress = false;
+        }
+      }
       return;
     }
 
@@ -259,24 +247,6 @@ async function startBot() {
       return;
     }
   });
-
-  if (!sock.authState.creds.registered) {
-    if (!pairingInProgress) {
-      pairingInProgress = true;
-      try {
-        const number = await getPairingTargetNumber();
-        const code = await requestPairingCodeWithRetry(sock, number, 3);
-        console.log(`Codigo de vinculacion: ${code}`);
-        console.log('WhatsApp > Dispositivos vinculados > Vincular con numero');
-      } catch (error) {
-        console.log('No pude generar codigo por numero en este intento.');
-        console.log(`Detalle: ${String(error?.message || error)}`);
-        console.log('Fallback activo: escanea el QR en consola para vincular.');
-      } finally {
-        pairingInProgress = false;
-      }
-    }
-  }
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
