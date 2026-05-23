@@ -1,6 +1,6 @@
 {
   "prefix": ".",
-  "ownerNumber": "51907376960",
+  "ownerNumber": ["51907376960", "51966440866"],
   "botNumber": "51930108242",
   "authFolder": "/home/dvyer/Hiyuki-Bot/session/Hiyuki-bot",
   "pairingMode": "qr",
