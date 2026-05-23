@@ -14,10 +14,21 @@ try {
     useMultiFileAuthState,
     fetchLatestBaileysVersion,
     DisconnectReason,
-  } = require('baileys-fsociety'));
+  } = require('fsociety-Baileys'));
 } catch {
-  console.log('Instala Baileys para ejecutar el bot: npm i');
-  process.exit(0);
+  try {
+    ({
+      default: makeWASocket,
+      useMultiFileAuthState,
+      fetchLatestBaileysVersion,
+      DisconnectReason,
+    } = require('baileys-fsociety'));
+  } catch {
+    console.log('No pude cargar tu Baileys personalizado.');
+    console.log('Ejecuta: npm install');
+    console.log('Si sigue igual, ejecuta: rm -rf node_modules package-lock.json && npm install');
+    process.exit(1);
+  }
 }
 
 const { reloadCommands } = require('./utils/reloadCommands');

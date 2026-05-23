@@ -7,7 +7,7 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "baileys-fsociety": "github:DevYerZx/fsociety-Baileys.git",
+    "fsociety-Baileys": "git+https://github.com/DevYerZx/fsociety-Baileys.git",
     "@hapi/boom": "^10.0.1",
     "axios": "^1.9.0",
     "ffmpeg-static": "^5.2.0",
