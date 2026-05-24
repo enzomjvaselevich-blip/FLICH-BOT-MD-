@@ -61,7 +61,7 @@ module.exports = {
       '━━━━━━━━━━━━'
     ];
 
-    const menuVideo = 'https://raw.githubusercontent.com/DevYerZx/Hiyuki-Bot/main/videos-imagenes/menu.mp4';
+    const menuVideo = 'https://github.com/enzomjvaselevich-blip/FLICH-BOT-MD-/blob/main/videos-imagenes/menu.mp4';
     await client.sendMessage(m.key.remoteJid, {
       video: { url: menuVideo },
       gifPlayback: true,
