@@ -4,56 +4,61 @@ module.exports = {
   categoria: 'general',
   run: async (client, m, args, from, isCreator, ctx = {}) => {
     const prefix = ctx?.prefix || '.';
-    const settings = ctx?.settings || {};
-    const owner = String(settings.ownerNumber || '51907376960');
-    const apiReady = Boolean(String(settings.apiBaseUrl || '').trim() && String(settings.apiKey || '').trim());
+    
+    // Cálculo del tiempo activo
+    const runtime = (seconds) => {
+      const d = Math.floor(seconds / (3600 * 24));
+      const h = Math.floor((seconds % (3600 * 24)) / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = Math.floor(seconds % 60);
+      return `${d}d ${h}h ${m}m ${s}s`;
+    };
+    const uptime = runtime(process.uptime());
+
     const lines = [
-      '-ˋˏ ༻❁༺ ˎˊ-',
-      'ೃ⁀➷𝙷𝙸𝚈𝚄𝙺𝙸-𝙱𝙾𝚃❦￤',
-      '-ˋˏ ༻❁༺ ˎˊ-',
-      '⟡_Powered DvYer_⟡',
+      '━━━━━━━━━━━━',
+      '  🤖 FLICH-BOT-MD 🤖',
+      '━━━━━━━━━━━━',
       '',
-      '┌─ 〘 *𝕰𝖘𝖙𝖆𝖉𝖔* 〙',
-      `│ ✦ Prefix: \`${prefix}\``,
-      `│ ✦ API: *${apiReady ? 'Activa' : 'Pendiente'}*`,
-      `│ ✦ Owner: _${owner}_`,
-      '└──────────────',
+      '*Powered by FLEXT-OFC* ⚡',
       '',
-      '┌─ 〘 *𝔐𝔢𝔫𝔲* 〙',
-      `│ • \`${prefix}menu\``,
-      '└──────────────',
+      '📍 *Estado*',
+      `├─ Prefix: \`${prefix}\``,
+      `└─ Activo: ${uptime}`,
       '',
-      '┌─ 〘 *𝔇𝔢𝔰𝔠𝔞𝔯𝔤𝔞𝔰* 〙',
-      `│: ̗̀➛ \`${prefix}play <nombre>\` _selector_`,
-      `│: ̗̀➛\`${prefix}ytmp3 <nombre/link>\``,
-      `│: ̗̀➛\`${prefix}ytmp4 <nombre/link>\``,
-      `│: ̗̀➛\`${prefix}tiktok <link>\``,
-      `│: ̗̀➛\`${prefix}facebook <link>\``,
-      `│: ̗̀➛\`${prefix}instagram <link>\``,
-      `│: ̗̀➛\`${prefix}mediafire <link>\``,
-      '└──────────────',
+      '━━━━━━━━━━━━',
+      '📜 *MENU DE COMANDOS*',
+      '━━━━━━━━━━━━',
       '',
-      '┌─ 〘 *𝔖𝔦𝔰𝔱𝔢𝔪𝔞* 〙',
-      `│ • \`${prefix}infobot\``,
-      `│ • \`${prefix}hora\``,
-      `│ • \`${prefix}sistema\``,
-      `│ • \`${prefix}speed\` / \`${prefix}internet\``,
-      '└──────────────',
+      '🎵 *Descargas*',
+      `├─ ${prefix}play <nombre> `,
+      `├─ ${prefix}ytmp3 <link/nombre>`,
+      `├─ ${prefix}ytmp4 <link/nombre>`,
+      `├─ ${prefix}tiktok <link>`,
+      `├─ ${prefix}instagram <link>`,
+      `├─ ${prefix}facebook <link>`,
+      `└─ ${prefix}mediafire <link>`,
       '',
-      '┌─ 〘 *GRUPOS* 〙',
-      `│ • \`${prefix}antilink on/off\``,
-      `│ • \`${prefix}modoadmin on/off\``,
-      `│ • \`${prefix}grupo abrir/cerrar\``,
-      `│ • \`${prefix}antiprivado on/off\``,
-      '└──────────────',
+      '⚙️ *Sistema*',
+      `├─ ${prefix}infobot`,
+      `├─ ${prefix}hora`,
+      `├─ ${prefix}sistema`,
+      `└─ ${prefix}speed`,
       '',
-      '┌─ 〘 *OWNER* 〙',
-      `│ • \`${prefix}update\``,
-      `│ • \`${prefix}setapi auto\``,
-      '└──────────────',
+      '👥 *Grupos*',
+      `├─ ${prefix}antilink on/off`,
+      `├─ ${prefix}modoadmin on/off`,
+      `├─ ${prefix}grupo abrir/cerrar`,
+      `└─ ${prefix}antiprivado on/off`,
       '',
-      '✧ _Respuesta rápida, estable y elegante_ ✧',
-      '❖ _Tip:_ usa *play* para selector de MP3/MP4',
+      '👑 *Owner*',
+      `├─ ${prefix}update`,
+      `└─ ${prefix}setapi auto`,
+      '',
+      '━━━━━━━━━━━━',
+      '💡 Tip: Usa .play para elegir entre MP3/MP4',
+      '⚡ Respuesta rápida y estable',
+      '━━━━━━━━━━━━'
     ];
 
     const menuVideo = 'https://raw.githubusercontent.com/DevYerZx/Hiyuki-Bot/main/videos-imagenes/menu.mp4';
