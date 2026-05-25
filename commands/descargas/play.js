@@ -84,7 +84,7 @@ module.exports = {
 
       const landingText =
 `╔══════════════════════════╗
-║    *HIYUKI PLAY HUB*     ║
+║    *FLICH - BOT - MD*     ║
 ╚══════════════════════════╝
 
 🔎 Busqueda: *${query}*
@@ -95,7 +95,7 @@ Pulsa *ELEGIR CANCION* y selecciona:
 • 🎥 *MP4* para video`;
 
       const payload = {
-        footer: 'HIYUKI-BOT',
+        footer: 'FLICH-BOT-MD',
         buttons: [
           {
             buttonId: 'play_select_open',
@@ -104,7 +104,7 @@ Pulsa *ELEGIR CANCION* y selecciona:
             nativeFlowInfo: {
               name: 'single_select',
               paramsJson: JSON.stringify({
-                title: '🎼 HIYUKI SELECTOR',
+                title: '🎼 FLICH-BOT SELECTION',
                 sections,
               }),
             },
@@ -128,12 +128,12 @@ Pulsa *ELEGIR CANCION* y selecciona:
         await client.sendMessage(from, {
           text:
 `╔══════════════════════════╗
-║      HIYUKI PLAY HUB     ║
+║      FLICH - BOT - MD      ║
 ╚══════════════════════════╝
 
 🔎 Busqueda: *${query}*
 Toca una opcion para descargar *MP3* o *MP4*.`,
-          footer: 'HIYUKI-BOT',
+          footer: 'FLICH-BOT-MD',
           title: '🎼 Selector de canciones',
           buttonText: '☷ Elegir cancion',
           sections: [
