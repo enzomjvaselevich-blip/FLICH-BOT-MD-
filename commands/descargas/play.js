@@ -44,7 +44,7 @@ module.exports = {
         params: { q: query, limit: 8, apikey: API_KEY },
         timeout: 60000,
       });
-      const results = Array.isArray(search?.data?.results) ? search.data.results : [];
+      const results = Array.isArray(search?.data?.results)? search.data.results : [];
 
       if (!results.length) {
         await client.sendMessage(from, { text: 'No encontre resultados en YouTube.' }, { quoted: m });
@@ -83,16 +83,16 @@ module.exports = {
       ];
 
       const landingText =
-`╔══════════════════════════╗
-║    *FLICH - BOT - MD*     ║
-╚══════════════════════════╝
+`𓊆ྀི❤︎𓊇ྀི *FLICH - BOT - MD* 𓊆ྀི❤︎𓊇ྀི
 
-🔎 Busqueda: *${query}*
-🎛️ Modo: _Selector interactivo_
+𓈈 Busqueda: *${query}*
+𓈈 Modo: _Selector interactivo_
 
-Pulsa *ELEGIR CANCION* y selecciona:
-• 🎧 *MP3* para audio
-• 🎥 *MP4* para video`;
+𓊝 Pulsa *ELEGIR CANCION* y elige:
+  🎧 MP3 𓂃 audio
+  🎥 MP4 𓂃 video
+
+𓊆ྀི❤︎𓊇ྀི FLICH-BOT-MD 𓊆ྀི❤︎𓊇ྀི`;
 
       const payload = {
         footer: 'FLICH-BOT-MD',
@@ -104,7 +104,7 @@ Pulsa *ELEGIR CANCION* y selecciona:
             nativeFlowInfo: {
               name: 'single_select',
               paramsJson: JSON.stringify({
-                title: '🎼 FLICH-BOT SELECTION',
+                title: '𓊆ྀི FLICH-BOT SELECTION 𓊇ྀི',
                 sections,
               }),
             },
@@ -127,14 +127,14 @@ Pulsa *ELEGIR CANCION* y selecciona:
       } catch {
         await client.sendMessage(from, {
           text:
-`╔══════════════════════════╗
-║      FLICH - BOT - MD      ║
-╚══════════════════════════╝
+`𓊆ྀི❤︎𓊇ྀི FLICH - BOT - MD 𓊆ྀི❤︎𓊇ྀི
 
-🔎 Busqueda: *${query}*
-Toca una opcion para descargar *MP3* o *MP4*.`,
+𓈈 Busqueda: *${query}*
+𓈈 Toca una opcion para descargar *MP3* o *MP4*.
+
+𓊆ྀི❤︎𓊇ྀི FLICH-BOT-MD 𓊆ྀི❤︎𓊇ྀི`,
           footer: 'FLICH-BOT-MD',
-          title: '🎼 Selector de canciones',
+          title: '𓊆ྀི Selector de canciones 𓊇ྀི',
           buttonText: '☷ Elegir cancion',
           sections: [
             { title: 'Descargar MP3', rows: rowsMp3.map((r) => ({ title: r.title, description: r.description, rowId: r.id })) },
@@ -145,7 +145,7 @@ Toca una opcion para descargar *MP3* o *MP4*.`,
       }
     } catch (error) {
       await react(client, m, '❌');
-      await client.sendMessage(from, { text: `Error en .play: ${String(error?.message || error)}` }, { quoted: m });
+      await client.sendMessage(from, { text: `Error en.play: ${String(error?.message || error)}` }, { quoted: m });
     }
   },
 };
