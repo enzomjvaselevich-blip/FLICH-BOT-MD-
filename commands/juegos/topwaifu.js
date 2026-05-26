@@ -1,48 +1,28 @@
-export default {
+Export default {
     command: ['topwaifu', 'top'],
     category: 'juegos',
-    run: async (client, m, args, usedPrefix, command) => {
-        try {
-            // 1. Acceso a la base de datos
-            const chat = global.db.data.chats[m.chat];
-            if (!chat || !chat.users) {
-                return await client.sendMessage(m.chat, { text: '❌ No hay datos de usuarios.' }, { quoted: m });
-            }
-
-            // 2. Construcción del ranking (Solo IDs y conteo)
-            const ranking = [];
-            for (const jid in chat.users) {
-                const count = chat.users[jid]?.characters?.length || 0;
-                if (count > 0) {
-                    ranking.push({ jid, count });
-                }
-            }
-
-            if (ranking.length === 0) {
-                return await client.sendMessage(m.chat, { text: '⟡ No hay waifus reclamadas.' }, { quoted: m });
-            }
-
-            // 3. Ordenar
-            ranking.sort((a, b) => b.count - a.count);
-            const top10 = ranking.slice(0, 10);
-
-            // 4. Formatear mensaje (Sin usar el array 'mentions' para evitar el crash)
-            let txt = '🏆 *Top más reclamados de waifus* 🏆\n\n';
-            
-            top10.forEach((item, index) => {
-                const number = item.jid.split('@')[0];
-                // Usamos el formato wa.me para que el link sea clicable sin crashear el bot
-                txt += `${index + 1}. wa.me/${number} ❯ *${item.count}*\n`;
-            });
-
-            // 5. Envío directo sin el parámetro 'mentions'
-            await client.sendMessage(m.chat, { 
-                text: txt
-            }, { quoted: m });
-
-        } catch (error) {
-            console.error("Error al ejecutar topwaifu:", error);
-            await client.sendMessage(m.chat, { text: '⚠️ Ocurrió un error al procesar el top.' });
+    run: async (sock, m, args, from, isOwner, { prefix }) => {
+        const chat = global.db?.data?.chats[from];
+        if (!chat || !chat.characters) {
+            return await sock.sendMessage(from, { text: '❌ No hay personajes reclamados.' }, { quoted: m });
         }
+
+        const userStats = {};
+        // Recorremos los personajes reclamados
+        for (const key in chat.characters) {
+            const userId = chat.characters[key].user;
+            userStats[userId] = (userStats[userId] || 0) + 1;
+        }
+
+        const top = Object.entries(userStats).sort((a, b) => b[1] - a[1]).slice(0, 10);
+        
+        if (top.length === 0) return await sock.sendMessage(from, { text: '⟡ No hay personajes.' }, { quoted: m });
+
+        let txt = '🏆 *TOP 10 WAIFUS* 🏆\n\n';
+        top.forEach((u, i) => {
+            txt += `${i + 1}. @${u[0].split('@')[0]} ❯ *${u[1]}*\n`;
+        });
+
+        await sock.sendMessage(from, { text: txt, mentions: top.map(u => u[0]) }, { quoted: m });
     }
 }
