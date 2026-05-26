@@ -8,7 +8,6 @@ export default {
     }
 
     // 2. Intentar obtener el ID del mensaje citado
-    // Esta es la forma más segura en Baileys de obtener el ID citado
     const quoted = m.quoted ? m.quoted : (m.message?.extendedTextMessage?.contextInfo?.stanzaId ? { key: { id: m.message.extendedTextMessage.contextInfo.stanzaId } } : null);
 
     if (!quoted) {
@@ -30,6 +29,14 @@ export default {
 
     // Marcar como reclamado
     chat.rolls[quotedId].claimed = true;
+    
+    // 5. Reaccionar con el emoji ✅
+    await sock.sendMessage(from, {
+        react: {
+            text: '✅',
+            key: m.key
+        }
+    });
     
     await sock.sendMessage(from, { 
         text: `⟡ ¡Has reclamado al personaje correctamente!`, 
