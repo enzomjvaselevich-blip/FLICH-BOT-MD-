@@ -26,25 +26,22 @@ export default {
             ranking.sort((a, b) => b.count - a.count);
             const top10 = ranking.slice(0, 10);
 
-            // 4. Formatear mensaje
+            // 4. Formatear mensaje (Sin usar el array 'mentions' para evitar el crash)
             let txt = '🏆 *Top más reclamados de waifus* 🏆\n\n';
-            const mentions = [];
-
+            
             top10.forEach((item, index) => {
-                mentions.push(item.jid); // Esto crea el tag clicable
                 const number = item.jid.split('@')[0];
-                txt += `${index + 1}. @${number} ❯ *${item.count}*\n`;
+                // Usamos el formato wa.me para que el link sea clicable sin crashear el bot
+                txt += `${index + 1}. wa.me/${number} ❯ *${item.count}*\n`;
             });
 
-            // 5. Envío directo con el cliente
+            // 5. Envío directo sin el parámetro 'mentions'
             await client.sendMessage(m.chat, { 
-                text: txt, 
-                mentions: mentions 
+                text: txt
             }, { quoted: m });
 
         } catch (error) {
-            console.error("Error crítico en topwaifu:", error);
-            // Si falla, intentamos enviar un mensaje simple para no romper el bot
+            console.error("Error al ejecutar topwaifu:", error);
             await client.sendMessage(m.chat, { text: '⚠️ Ocurrió un error al procesar el top.' });
         }
     }
