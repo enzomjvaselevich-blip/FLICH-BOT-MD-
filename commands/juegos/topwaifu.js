@@ -3,44 +3,40 @@ export default {
   category: 'juegos',
   run: async (client, m, args, usedPrefix, command) => {
     try {
-      // 1. Acceso seguro a la base de datos
+      // 1. Obtener base de datos de forma segura
       const chat = global.db?.data?.chats?.[m.chat];
       if (!chat || !chat.users) {
-        return await client.sendMessage(m.chat, { text: '❌ No hay datos de usuarios.' }, { quoted: m });
+        return await client.sendMessage(m.chat, { text: '❌ No hay registros de usuarios en este grupo.' }, { quoted: m });
       }
 
-      // 2. Construcción del ranking (Solo IDs y conteo)
-      const ranking = [];
-      for (const jid in chat.users) {
-        const count = chat.users[jid]?.characters?.length || 0;
-        if (count > 0) {
-          ranking.push({ jid, count });
-        }
-      }
+      // 2. Procesar ranking sin usar funciones complejas
+      const ranking = Object.keys(chat.users)
+        .map(jid => ({
+          jid: jid,
+          count: Array.isArray(chat.users[jid]?.characters) ? chat.users[jid].characters.length : 0
+        }))
+        .filter(u => u.count > 0)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
 
       if (ranking.length === 0) {
-        return await client.sendMessage(m.chat, { text: '⟡ No hay waifus reclamadas.' }, { quoted: m });
+        return await client.sendMessage(m.chat, { text: '⟡ No hay waifus reclamadas todavía.' }, { quoted: m });
       }
 
-      // 3. Ordenar por cantidad
-      ranking.sort((a, b) => b.count - a.count);
-      const top10 = ranking.slice(0, 10);
-
-      // 4. Formatear mensaje SIN usar 'mentions' para evitar el crash
-      let txt = '🏆 *Top más reclamados de waifus* 🏆\n\n';
-      
-      top10.forEach((item, index) => {
-        const number = item.jid.split('@')[0];
-        // Usamos wa.me para el link y así evitamos menciones que causan el crash
-        txt += `${index + 1}. wa.me/${number} ❯ *${item.count}*\n`;
+      // 3. Crear el mensaje de texto puro (sin menciones = sin crash)
+      let txt = '🏆 *Top 10 Waifus Reclamadas* 🏆\n\n';
+      ranking.forEach((u, i) => {
+        const num = u.jid.split('@')[0];
+        txt += `${i + 1}. wa.me/${num} ❯ *${u.count} personajes*\n`;
       });
 
-      // 5. Envío directo usando el cliente (método nativo)
+      // 4. Envío directo mediante sendMessage (evitando lógica de m.reply)
       await client.sendMessage(m.chat, { text: txt }, { quoted: m });
 
     } catch (e) {
-      console.error("Error en topwaifu:", e);
-      await client.sendMessage(m.chat, { text: '⚠️ Ocurrió un error al procesar el top.' }, { quoted: m });
+      console.error("Error crítico en topwaifu:", e);
+      // Fallback simple para evitar que la consola se inunde de errores
+      await client.sendMessage(m.chat, { text: '⚠️ Error al cargar el top.' }, { quoted: m });
     }
   }
 }
