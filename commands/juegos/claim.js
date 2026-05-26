@@ -14,20 +14,17 @@ function getCharacterById(id, structure) {
 export default {
   command: ['claim', 'c', 'reclamar'],
   category: 'gacha',
-  run: async (sock, m, args, from, isOwner, context) => {
+  // IMPORTANTE: Usamos los mismos parámetros que rw.js
+  run: async (sock, m, args, from) => {
     try {
-      // Protección de DB
-      if (!global.db || !global.db.data) return await sock.sendMessage(from, { text: "La base de datos no está lista." }, { quoted: m });
+      if (!global.db?.data) return await sock.sendMessage(from, { text: "Base de datos no cargada." }, { quoted: m });
       
       const db = global.db.data
-      db.chats = db.chats || {}
       db.chats[from] = db.chats[from] || { users: {}, characters: {}, rolls: {} }
       const chat = db.chats[from]
 
       const quotedId = m.quoted?.id || m.message?.extendedTextMessage?.contextInfo?.stanzaId
-      if (!quotedId || !chat.rolls[quotedId]) {
-        return await sock.sendMessage(from, { text: '⟡ Debes citar un personaje válido.' }, { quoted: m })
-      }
+      if (!quotedId || !chat.rolls[quotedId]) return await sock.sendMessage(from, { text: '⟡ Cita un personaje.' }, { quoted: m })
 
       const rollData = chat.rolls[quotedId]
       const structure = await loadCharacters()
@@ -36,13 +33,14 @@ export default {
       if (!sourceData) return await sock.sendMessage(from, { text: '⟡ Personaje no encontrado.' }, { quoted: m })
       
       chat.characters[rollData.id] = chat.characters[rollData.id] || {}
-      if (chat.characters[rollData.id].user) return await sock.sendMessage(from, { text: `⟡ Ya pertenece a alguien.` }, { quoted: m })
+      if (chat.characters[rollData.id].user) return await sock.sendMessage(from, { text: `⟡ Ya tiene dueño.` }, { quoted: m })
 
       chat.characters[rollData.id] = { user: m.sender, name: sourceData.name }
       chat.rolls[quotedId].claimed = true
 
-      await sock.sendMessage(from, { text: `⟡ *${sourceData.name}* ha sido reclamado.` }, { quoted: m })
+      await sock.sendMessage(from, { text: `⟡ *${sourceData.name}* reclamado.` }, { quoted: m })
     } catch (e) {
+      console.error(e);
       await sock.sendMessage(from, { text: `> Error: ${e.message}` }, { quoted: m })
     }
   }
