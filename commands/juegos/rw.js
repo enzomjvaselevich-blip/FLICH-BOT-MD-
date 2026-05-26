@@ -5,8 +5,9 @@ const FILE_PATH = './core/characters.json';
 
 async function loadCharacters() {
     try {
-        const data = JSON.parse(await fs.readFile(FILE_PATH, 'utf-8'));
-        return Object.values(data).flatMap(cat => cat.characters);
+        const raw = await fs.readFile(FILE_PATH, 'utf-8');
+        const data = JSON.parse(raw);
+        return Object.values(data).flatMap(cat => cat.characters || []);
     } catch (e) { return []; }
 }
 
@@ -23,28 +24,37 @@ async function buscarImagen(tag) {
 }
 
 export default {
-    name: 'rw',
     command: ['rw', 'rollwaifu', 'ruleta'],
     category: 'gacha',
-    isOwner: false,
-    group: true,
-    admin: false,
-    run: async (sock, m, args, from, isOwner, context) => {
+    run: async (client, m, args, usedPrefix, command) => {
         try {
+            // Protección: Verificar DB
+            if (!global.db || !global.db.data) {
+                return m.reply("⟡ Base de datos no inicializada.");
+            }
+
             const all = await loadCharacters();
+            if (all.length === 0) return m.reply("No hay personajes cargados.");
+
             const selected = all[Math.floor(Math.random() * all.length)];
             const media = await buscarImagen(selected.tags);
 
             let caption = `⋆˚࿔ *${selected.name}* 𐙚˚⋆\n\n` +
-                          `• Valor: ¥${selected.value}\n` +
-                          `• Género: ${selected.gender}`;
+                          `• Valor: ¥${selected.value || 100}\n` +
+                          `• Género: ${selected.gender || 'Desconocido'}`;
 
-            const img = await axios.get(media || 'https://i.imgur.com/8JqP4kE.png', { responseType: 'arraybuffer' });
-            const sent = await sock.sendMessage(from, { image: Buffer.from(img.data), caption }, { quoted: m });
+            const imgRes = await axios.get(media || 'https://i.imgur.com/8JqP4kE.png', { responseType: 'arraybuffer' });
+            const sent = await client.sendMessage(m.chat, { 
+                image: Buffer.from(imgRes.data), 
+                caption: caption 
+            }, { quoted: m });
 
-            global.db.data.chats[from].rolls[sent.key.id] = { id: selected.id, claimed: false };
+            global.db.data.chats[m.chat].rolls = global.db.data.chats[m.chat].rolls || {};
+            global.db.data.chats[m.chat].rolls[sent.key.id] = { id: selected.id, claimed: false };
+
         } catch (e) {
-            await sock.sendMessage(from, { text: "Error procesando la ruleta." }, { quoted: m });
+            console.error(e);
+            m.reply("Error procesando la ruleta.");
         }
     }
 };
