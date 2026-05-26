@@ -3,49 +3,38 @@ const path = require('path');
 
 function reloadCommands(dir = path.join(process.cwd(), 'commands')) {
   const commandsMap = new Map();
-  console.log('--- Iniciando carga de comandos ---');
-
+  
   function readCommands(folder) {
     if (!fs.existsSync(folder)) return;
-
     const files = fs.readdirSync(folder, { withFileTypes: true });
+    
     for (const file of files) {
       const fullPath = path.join(folder, file.name);
-
       if (file.isDirectory()) {
         readCommands(fullPath);
         continue;
       }
-
       if (!file.name.endsWith('.js')) continue;
 
       try {
         delete require.cache[require.resolve(fullPath)];
         const imported = require(fullPath);
-        
-        // CORRECCIÓN: Si el archivo usa 'export default', 
-        // la estructura está dentro de .default
+        // IMPORTANTE: Esto detecta si es export default o module.exports
         const cmd = imported.default || imported;
 
-        // Verifica si tiene la propiedad 'command'
-        if (!cmd || !cmd.command) {
-          console.log(`[!] Saltando ${file.name}: no tiene propiedad 'command'`);
-          continue;
+        if (cmd && Array.isArray(cmd.command)) {
+          for (const c of cmd.command) {
+            commandsMap.set(String(c).toLowerCase(), cmd);
+          }
         }
-
-        for (const c of cmd.command) {
-          commandsMap.set(String(c).toLowerCase(), cmd);
-        }
-        console.log(`[✓] Comando cargado: ${cmd.command.join(', ')} (Archivo: ${file.name})`);
       } catch (err) {
-        console.log(`[X] Error al cargar ${file.name}:`, err.message);
+        console.log(`[X] Error cargando ${file.name}: ${err.message}`);
       }
     }
   }
 
   readCommands(dir);
   global.comandos = commandsMap;
-  console.log(`--- Se cargaron ${commandsMap.size} comandos en total ---`);
   return commandsMap;
 }
 
