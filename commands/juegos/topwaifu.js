@@ -1,38 +1,54 @@
+import fs from 'fs';
+import path from 'path';
+
 export default {
   command: ['topwaifu', 'top'],
   category: 'juegos',
   run: async (client, m, args, usedPrefix, command) => {
     try {
-      // 1. Acceso seguro
-      const chat = global.db?.data?.chats?.[m.chat];
-      if (!chat?.users) return;
+      const WAIFUS_DIR = path.join(process.cwd(), 'waifus_guardados');
+      
+      // 1. Verificar si la carpeta existe
+      if (!fs.existsSync(WAIFUS_DIR)) {
+        return await client.sendMessage(m.chat, { text: '⟡ No hay registros de waifus guardados aún.' });
+      }
 
-      // 2. Ranking
-      const ranking = Object.entries(chat.users)
-        .map(([jid, data]) => ({
-          jid: jid,
-          count: Array.isArray(data.characters) ? data.characters.length : 0
-        }))
-        .filter(u => u.count > 0)
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10);
+      // 2. Leer todos los archivos de la carpeta
+      const files = fs.readdirSync(WAIFUS_DIR);
+      const ranking = [];
 
-      if (ranking.length === 0) return;
-
-      // 3. Texto plano puro (sin menciones ni lógica de librería)
-      let txt = '🏆 *Top 10 Waifus Reclamadas* 🏆\n\n';
-      ranking.forEach((u, i) => {
-        const num = u.jid.split('@')[0];
-        txt += `${i + 1}. wa.me/${num} ❯ *${u.count}*\n`;
+      files.forEach(file => {
+        if (file.endsWith('.json')) {
+          const filePath = path.join(WAIFUS_DIR, file);
+          const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+          
+          if (data.waifus && data.waifus.length > 0) {
+            ranking.push({
+              number: file.replace('.json', ''),
+              count: data.waifus.length
+            });
+          }
+        }
       });
 
-      // 4. ENVÍO SIN 'QUOTED' Y SIN 'MENTIONS'
-      // Al quitar 'quoted: m', evitamos que la librería intente leer un objeto 
-      // que causa el error de destructuring.
+      // 3. Ordenar por cantidad
+      const sortedRanking = ranking.sort((a, b) => b.count - a.count).slice(0, 10);
+
+      if (sortedRanking.length === 0) {
+        return await client.sendMessage(m.chat, { text: '⟡ El ranking está vacío.' });
+      }
+
+      // 4. Formatear mensaje
+      let txt = '🏆 *Top 10 Waifus (Registro Físico)* 🏆\n\n';
+      sortedRanking.forEach((item, index) => {
+        txt += `${index + 1}. wa.me/${item.number} ❯ *${item.count} personajes*\n`;
+      });
+
+      // 5. Envío (Sin quoted para evitar errores de la librería)
       await client.sendMessage(m.chat, { text: txt });
 
     } catch (e) {
-      console.error("Error bypass aplicado:", e);
+      console.error("Error en topwaifu.js:", e);
     }
   }
 }
