@@ -1,0 +1,29 @@
+{
+  "dragon_ball": {
+    "name": "Dragon Ball",
+    "characters": [
+      { "id": "db001", "name": "Son Goku", "value": 980000, "gender": "Hombre", "tags": ["son_goku"] },
+      { "id": "db002", "name": "Vegeta", "value": 930000, "gender": "Hombre", "tags": ["vegeta"] },
+      { "id": "db003", "name": "Gohan", "value": 870000, "gender": "Hombre", "tags": ["gohan"] },
+      { "id": "db004", "name": "Krillin", "value": 9000, "gender": "Hombre", "tags": ["krillin"] },
+      { "id": "db005", "name": "Piccolo", "value": 850000, "gender": "Hombre", "tags": ["piccolo"] }
+    ]
+  },
+  "one_piece": {
+    "name": "One Piece",
+    "characters": [
+      { "id": "op001", "name": "Monkey D. Luffy", "value": 990000, "gender": "Hombre", "tags": ["luffy"] },
+      { "id": "op002", "name": "Roronoa Zoro", "value": 940000, "gender": "Hombre", "tags": ["zoro"] },
+      { "id": "op003", "name": "Sanji", "value": 880000, "gender": "Hombre", "tags": ["sanji"] },
+      { "id": "op004", "name": "Nami", "value": 30000, "gender": "Mujer", "tags": ["nami"] }
+    ]
+  },
+  "varios": {
+    "name": "Varios",
+    "characters": [
+      { "id": "v001", "name": "Yue", "value": 800000, "gender": "Mujer", "tags": ["yue"] },
+      { "id": "v002", "name": "Seiya Ryuuguuin", "value": 500000, "gender": "Hombre", "tags": ["seiya"] },
+      { "id": "v003", "name": "Maple", "value": 250000, "gender": "Mujer", "tags": ["maple"] }
+    ]
+  }
+}
