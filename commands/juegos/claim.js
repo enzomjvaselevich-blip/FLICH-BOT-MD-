@@ -1,9 +1,16 @@
+import fs from 'fs';
+import path from 'path';
+
 export default {
   command: ['claim', 'c', 'reclamar'],
   category: 'juegos',
   run: async (sock, m, args, from, isOwner, { prefix }) => {
     try {
-      // 1. Validar DB con encadenamiento opcional para evitar crashes
+      // 1. Asegurar carpeta de respaldo
+      const WAIFUS_DIR = path.join(process.cwd(), 'waifus_guardados');
+      if (!fs.existsSync(WAIFUS_DIR)) fs.mkdirSync(WAIFUS_DIR, { recursive: true });
+
+      // 2. Validar DB
       if (!global.db?.data?.chats) {
         return await sock.sendMessage(from, { text: '❌ Base de datos no inicializada.' }, { quoted: m });
       }
@@ -11,15 +18,14 @@ export default {
       global.db.data.chats[from] = global.db.data.chats[from] || { users: {}, characters: {}, rolls: {} };
       const chat = global.db.data.chats[from];
 
-      // 2. Obtener el ID citado de forma robusta
+      // 3. Obtener el ID citado
       const quoted = m.quoted ? m.quoted : (m.message?.extendedTextMessage?.contextInfo?.stanzaId ? { key: { id: m.message.extendedTextMessage.contextInfo.stanzaId } } : null);
       if (!quoted) {
         return await sock.sendMessage(from, { text: '⟡ Debes CITAR el mensaje del personaje.' }, { quoted: m });
       }
 
       const quotedId = quoted.key.id;
-
-      if (!chat.rolls || !chat.rolls[quotedId]) {
+      if (!chat.rolls?.[quotedId]) {
         return await sock.sendMessage(from, { text: '⟡ No encontré registro de este personaje.' }, { quoted: m });
       }
 
@@ -27,26 +33,29 @@ export default {
         return await sock.sendMessage(from, { text: '⟡ Ya fue reclamado.' }, { quoted: m });
       }
 
-      // 3. Guardado en la estructura que usa robwaifu y topwaifu
+      // 4. Guardar en Global DB
       const charId = chat.rolls[quotedId].id;
-      
       chat.users = chat.users || {};
       chat.users[m.sender] = chat.users[m.sender] || { characters: [] };
-      
-      // Guardar ID en la lista del usuario
       chat.users[m.sender].characters.push(charId);
-      
-      // Guardar info general del personaje
-      chat.characters = chat.characters || {};
-      if (!chat.characters[charId]) {
-        chat.characters[charId] = { name: chat.rolls[quotedId].name || "Desconocido" };
-      }
-
       chat.rolls[quotedId].claimed = true;
 
-      // 4. RESPUESTA SEGURA: Usamos sock.sendMessage (evitando m.reply o menciones complejas)
+      // 5. GUARDADO PERSISTENTE EN CARPETA (waifus_guardados)
+      const userId = m.sender.split('@')[0];
+      const userFile = path.join(WAIFUS_DIR, `${userId}.json`);
+      let userData = fs.existsSync(userFile) ? JSON.parse(fs.readFileSync(userFile, 'utf8')) : { jid: m.sender, waifus: [] };
+      
+      userData.waifus.push({
+        id: charId,
+        name: chat.rolls[quotedId].name || "Desconocido",
+        timestamp: new Date().toISOString()
+      });
+      
+      fs.writeFileSync(userFile, JSON.stringify(userData, null, 2));
+
+      // 6. Respuesta
       await sock.sendMessage(from, { react: { text: '✅', key: m.key } });
-      await sock.sendMessage(from, { text: `⟡ ¡Has reclamado al personaje correctamente!` }, { quoted: m });
+      await sock.sendMessage(from, { text: `⟡ ¡Has reclamado a ${chat.rolls[quotedId].name || 'un personaje'} correctamente!` }, { quoted: m });
 
     } catch (e) {
       console.error("Error en claim.js:", e);
