@@ -13,7 +13,7 @@ export default {
       const ranking = Object.keys(chat.users)
         .map(jid => {
           const user = chat.users[jid];
-          const count = Array.isArray(user.characters) ? user.characters.length : 0;
+          const count = Array.isArray(user?.characters) ? user.characters.length : 0;
           return { jid, count };
         })
         .filter(u => u.count > 0)
@@ -24,16 +24,17 @@ export default {
         return await client.sendMessage(m.chat, { text: '⟡ No hay waifus reclamadas aún.' }, { quoted: m });
       }
 
-      // 3. Formatear mensaje SIN MENCIONES (evita el crash de la librería)
+      // 3. Formatear mensaje SIN MENCIONES
+      // Usamos texto plano y links de wa.me para evitar el error de decodificación de la librería
       let txt = '🏆 *Top 10 Waifus Reclamadas* 🏆\n\n';
       
       ranking.forEach((item, index) => {
         const number = item.jid.split('@')[0];
-        // Usamos wa.me para el enlace, esto evita que la librería intente decodificar el JID
         txt += `${index + 1}. wa.me/${number} ❯ *${item.count} personajes*\n`;
       });
 
-      // 4. Envío directo usando el cliente (método nativo, sin usar m.reply)
+      // 4. Envío directo usando el cliente (método nativo)
+      // No incluimos 'mentions' aquí para evitar el error de destructuring
       await client.sendMessage(m.chat, { text: txt }, { quoted: m });
 
     } catch (e) {
