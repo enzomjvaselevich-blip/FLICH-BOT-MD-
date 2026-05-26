@@ -5,10 +5,17 @@ const USERS_FILE_PATH = './core/users.json';
 
 export default {
     command: ['topreclamos', 'toppersonajes', 'topwaifus'],
-    category: 'gacha',
+    category: 'juegos',
     run: async (ctx) => {
-        const { sock, from } = ctx;
+        // Buscamos dinámicamente la conexión y el origen del mensaje
         const m = ctx.m || ctx.msg;
+        const sock = ctx.sock || ctx.conn || ctx.client || ctx.bot;
+        const from = ctx.from || (m && m.chat) || (m && m.key && m.key.remoteJid);
+
+        if (!sock) {
+            console.error("Error: No se encontró el objeto de conexión de Baileys en ctx.");
+            return;
+        }
 
         try {
             // 1. Verificar si el archivo existe, si no, crearlo automáticamente
@@ -28,7 +35,7 @@ export default {
                 }
             }
 
-            // 2. Obtener los metadatos del grupo para saber quiénes están presentes
+            // 2. Obtener los metadatos del grupo
             const groupMetadata = await sock.groupMetadata(from).catch(() => null);
             if (!groupMetadata) {
                 return await sock.sendMessage(from, { text: "Este comando solo funciona en grupos." }, { quoted: m });
@@ -41,7 +48,6 @@ export default {
             
             for (const jid of participants) {
                 if (usersData[jid]) {
-                    // Se verifica el array de personajes de cada usuario
                     const cantidad = usersData[jid].personajes ? usersData[jid].personajes.length : 0; 
                     if (cantidad > 0) {
                         leaderboard.push({ jid, cantidad });
@@ -78,7 +84,9 @@ export default {
 
         } catch (e) {
             console.error("Error crítico en el top de personajes:", e);
-            await sock.sendMessage(from, { text: "Ocurrió un error al procesar el top." }, { quoted: m });
+            if (sock && sock.sendMessage) {
+                await sock.sendMessage(from, { text: "Ocurrió un error al procesar el top." }, { quoted: m });
+            }
         }
     }
 };
