@@ -34,7 +34,7 @@ export default {
 
             const imgRes = await axios.get(media, { responseType: 'arraybuffer' });
             
-            // He quitado la línea de "Valor" del caption
+            // Caption sin valor
             const sent = await sock.sendMessage(from, { 
                 image: Buffer.from(imgRes.data), 
                 caption: `⋆˚࿔ *${selected.name}* 𐙚˚⋆` 
