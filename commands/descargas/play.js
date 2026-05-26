@@ -95,7 +95,7 @@ module.exports = {
 𓊆ྀི❤︎𓊇ྀི FLICH-BOT-MD 𓊆ྀི❤︎𓊇ྀི`;
 
       const payload = {
-        footer: 'FLICH-BOT-MD',
+        footer: '🌸 FLICH-BOT-MD 🌸',
         buttons: [
           {
             buttonId: 'play_select_open',
@@ -133,7 +133,7 @@ module.exports = {
 𓈈 Toca una opcion para descargar *MP3* o *MP4*.
 
 𓊆ྀི❤︎𓊇ྀི FLICH-BOT-MD 𓊆ྀི❤︎𓊇ྀི`,
-          footer: 'FLICH-BOT-MD',
+          footer: '🌸 FLICH-BOT-MD 🌸',
           title: '𓊆ྀི Selector de canciones 𓊇ྀི',
           buttonText: '☷ Elegir cancion',
           sections: [
