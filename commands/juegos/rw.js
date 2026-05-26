@@ -1,0 +1,50 @@
+import axios from 'axios';
+import fs from 'node:fs/promises';
+
+const FILE_PATH = './core/characters.json';
+
+async function loadCharacters() {
+    try {
+        const data = JSON.parse(await fs.readFile(FILE_PATH, 'utf-8'));
+        return Object.values(data).flatMap(cat => cat.characters);
+    } catch (e) { return []; }
+}
+
+async function buscarImagen(tag) {
+    try {
+        const query = (Array.isArray(tag) ? tag[0] : tag).trim().toLowerCase().replace(/\s+/g, '_');
+        const { data } = await axios.get(`https://safebooru.org/index.php?page=dapi&s=post&q=index&json=1&tags=${query}`, { timeout: 5000 });
+        if (Array.isArray(data) && data.length > 0) {
+            const p = data[Math.floor(Math.random() * data.length)];
+            return `https://safebooru.org/images/${p.directory}/${p.image}`;
+        }
+    } catch (e) { return null; }
+    return null;
+}
+
+export default {
+    name: 'rw',
+    command: ['rw', 'rollwaifu', 'ruleta'],
+    category: 'gacha',
+    isOwner: false,
+    group: true,
+    admin: false,
+    run: async (sock, m, args, from, isOwner, context) => {
+        try {
+            const all = await loadCharacters();
+            const selected = all[Math.floor(Math.random() * all.length)];
+            const media = await buscarImagen(selected.tags);
+
+            let caption = `⋆˚࿔ *${selected.name}* 𐙚˚⋆\n\n` +
+                          `• Valor: ¥${selected.value}\n` +
+                          `• Género: ${selected.gender}`;
+
+            const img = await axios.get(media || 'https://i.imgur.com/8JqP4kE.png', { responseType: 'arraybuffer' });
+            const sent = await sock.sendMessage(from, { image: Buffer.from(img.data), caption }, { quoted: m });
+
+            global.db.data.chats[from].rolls[sent.key.id] = { id: selected.id, claimed: false };
+        } catch (e) {
+            await sock.sendMessage(from, { text: "Error procesando la ruleta." }, { quoted: m });
+        }
+    }
+};
