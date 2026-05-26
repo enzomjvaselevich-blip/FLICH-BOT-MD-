@@ -20,7 +20,6 @@ async function loadCharacters() {
 export default {
     command: ['rw', 'rollwaifu', 'ruleta'],
     category: 'gacha',
-    // IMPORTANTE: Ajustamos los parámetros a (sock, m, args, from)
     run: async (sock, m, args, from) => {
         try {
             const allCharacters = await loadCharacters();
@@ -34,12 +33,13 @@ export default {
             const media = `https://safebooru.org/images/${p.directory}/${p.image}`;
 
             const imgRes = await axios.get(media, { responseType: 'arraybuffer' });
+            
+            // He quitado la línea de "Valor" del caption
             const sent = await sock.sendMessage(from, { 
                 image: Buffer.from(imgRes.data), 
-                caption: `⋆˚࿔ *${selected.name}* 𐙚˚⋆\n\n• Valor: ¥${selected.value || 100}` 
+                caption: `⋆˚࿔ *${selected.name}* 𐙚˚⋆` 
             }, { quoted: m });
 
-            // Validación segura de global.db
             if (global.db?.data?.chats) {
                 global.db.data.chats[from] = global.db.data.chats[from] || { rolls: {} };
                 global.db.data.chats[from].rolls[sent.key.id] = { id: selected.id, claimed: false };
