@@ -9,15 +9,11 @@ async function loadCharacters() {
   } catch (e) { return {} }
 }
 
-function getCharacterById(id, structure) {
-  return Object.values(structure).flatMap(s => s.characters).find(c => String(c.id) === String(id))
-}
-
 export default {
   command: ['claim', 'c', 'reclamar'],
-  category: 'gacha',
-  run: async (sock, m, args, from, isOwner, context) => {
-    // Si global.db.data no existe, lo inicializamos en el momento
+  category: 'juegos',
+  run: async (sock, m, args, from, isOwner, { prefix }) => {
+    // 1. Asegurar que la base de datos global exista
     if (!global.db) global.db = { data: { chats: {} } };
     if (!global.db.data) global.db.data = { chats: {} };
     
@@ -25,24 +21,46 @@ export default {
     db.chats[from] = db.chats[from] || { users: {}, characters: {}, rolls: {} };
     const chat = db.chats[from];
 
-    const quotedId = m.quoted?.id || m.message?.extendedTextMessage?.contextInfo?.stanzaId;
-    if (!quotedId || !chat.rolls?.[quotedId]) {
-      return await sock.sendMessage(from, { text: '⟡ Cita un personaje para reclamar.' }, { quoted: m });
+    // 2. Obtener el ID del mensaje citado
+    const quoted = m.quoted ? m.quoted : m;
+    const quotedId = quoted.id || (m.message?.extendedTextMessage?.contextInfo?.stanzaId);
+
+    if (!quotedId || !chat.rolls[quotedId]) {
+      return await sock.sendMessage(from, { text: '⟡ Cita el mensaje del personaje que quieres reclamar.' }, { quoted: m });
     }
 
+    // 3. Verificar si ya fue reclamado
     if (chat.rolls[quotedId].claimed) {
-      return await sock.sendMessage(from, { text: '⟡ Ya fue reclamado.' }, { quoted: m });
+      return await sock.sendMessage(from, { text: '⟡ Este personaje ya fue reclamado anteriormente.' }, { quoted: m });
     }
 
+    // 4. Obtener datos del personaje
+    const characterId = chat.rolls[quotedId].id;
     const structure = await loadCharacters();
-    const sourceData = getCharacterById(chat.rolls[quotedId].id, structure);
-
-    if (!sourceData) return await sock.sendMessage(from, { text: '⟡ No encontrado.' }, { quoted: m });
     
+    // Buscamos el nombre en el archivo JSON de personajes
+    let characterName = "Desconocido";
+    for (const category in structure) {
+        const found = structure[category].characters.find(c => String(c.id) === String(characterId));
+        if (found) {
+            characterName = found.name;
+            break;
+        }
+    }
+
+    // 5. Realizar el reclamo
     chat.characters = chat.characters || {};
-    chat.characters[chat.rolls[quotedId].id] = { user: m.sender, name: sourceData.name };
+    chat.characters[characterId] = { 
+        user: m.sender, 
+        name: characterName,
+        timestamp: Date.now()
+    };
+    
     chat.rolls[quotedId].claimed = true;
 
-    await sock.sendMessage(from, { text: `⟡ *${sourceData.name}* reclamado por ${m.pushName || 'ti'}.` }, { quoted: m });
+    await sock.sendMessage(from, { 
+        text: `⟡ ¡Felicidades! Has reclamado a *${characterName}* correctamente.`, 
+        mentions: [m.sender] 
+    }, { quoted: m });
   }
 }
