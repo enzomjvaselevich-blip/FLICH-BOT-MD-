@@ -1,46 +1,41 @@
 export default {
-  command: ['claim', 'c', 'reclamar'],
-  category: 'juegos',
-  run: async (sock, m, args, from, isOwner, { prefix }) => {
-    // 1. Validar DB
-    if (!global.db?.data?.chats) return await sock.sendMessage(from, { text: '❌ Base de datos no inicializada.' }, { quoted: m });
+    command: ['topwaifu', 'top'],
+    category: 'juegos',
+    run: async (sock, m, args, from, isOwner, { prefix }) => {
+        const chat = global.db?.data?.chats[from];
+        
+        if (!chat || !chat.users || Object.keys(chat.users).length === 0) {
+            return await sock.sendMessage(from, { text: '❌ No hay personajes reclamados todavía.' }, { quoted: m });
+        }
 
-    global.db.data.chats[from] = global.db.data.chats[from] || { users: {}, characters: {}, rolls: {} };
-    const chat = global.db.data.chats[from];
+        const top = [];
+        // Contamos basándonos en la lista 'characters' de cada usuario
+        for (const userId in chat.users) {
+            const userChars = chat.users[userId].characters || [];
+            top.push([userId, userChars.length]);
+        }
 
-    // 2. Obtener el ID citado
-    const quoted = m.quoted ? m.quoted : (m.message?.extendedTextMessage?.contextInfo?.stanzaId ? { key: { id: m.message.extendedTextMessage.contextInfo.stanzaId } } : null);
-    if (!quoted) return await sock.sendMessage(from, { text: '⟡ Debes CITAR el mensaje del personaje.' }, { quoted: m });
+        // Ordenamos por cantidad
+        top.sort((a, b) => b[1] - a[1]);
+        const finalTop = top.slice(0, 10);
+        
+        if (finalTop.length === 0 || finalTop[0][1] === 0) {
+            return await sock.sendMessage(from, { text: '⟡ No hay personajes reclamados para mostrar.' }, { quoted: m });
+        }
 
-    const quotedId = quoted.key.id;
+        let txt = '🏆 *Top más reclamados de waifus* 🏆\n\n';
+        const mentions = [];
 
-    if (!chat.rolls || !chat.rolls[quotedId]) {
-        return await sock.sendMessage(from, { text: '⟡ No encontré registro de este personaje.' }, { quoted: m });
+        finalTop.forEach((u, i) => {
+            const jid = u[0];
+            const count = u[1];
+            mentions.push(jid);
+            txt += `${i + 1}. @${jid.split('@')[0]} ❯ *${count}*\n`;
+        });
+
+        await sock.sendMessage(from, { 
+            text: txt, 
+            mentions: mentions 
+        }, { quoted: m });
     }
-
-    if (chat.rolls[quotedId].claimed) {
-        return await sock.sendMessage(from, { text: '⟡ Ya fue reclamado.' }, { quoted: m });
-    }
-
-    // 3. Guardado en la estructura que usa robwaifu
-    const charId = chat.rolls[quotedId].id;
-    
-    // Asegurar usuario en DB
-    chat.users = chat.users || {};
-    chat.users[m.sender] = chat.users[m.sender] || { characters: [] };
-    
-    // Guardar ID en la lista del usuario
-    chat.users[m.sender].characters.push(charId);
-    
-    // Guardar info general del personaje si no existe
-    chat.characters = chat.characters || {};
-    if (!chat.characters[charId]) {
-        chat.characters[charId] = { name: chat.rolls[quotedId].name || "Desconocido" };
-    }
-
-    chat.rolls[quotedId].claimed = true;
-
-    await sock.sendMessage(from, { react: { text: '✅', key: m.key } });
-    await sock.sendMessage(from, { text: `⟡ ¡Has reclamado al personaje correctamente!` }, { quoted: m });
-  }
 }
