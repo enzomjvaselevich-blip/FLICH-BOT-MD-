@@ -2,42 +2,47 @@ export default {
     command: ['topwaifu', 'top'],
     category: 'juegos',
     run: async (client, m, args, usedPrefix, command) => {
+        // 1. Acceder al chat actual en la DB
         const chat = global.db.data.chats[m.chat];
         
-        // Verificación de existencia
+        // 2. Validación de seguridad para evitar errores de "undefined"
         if (!chat || !chat.users || Object.keys(chat.users).length === 0) {
-            return await client.sendMessage(m.chat, { text: '❌ No hay personajes reclamados.' }, { quoted: m });
+            return await client.sendMessage(m.chat, { text: '❌ No hay usuarios con personajes reclamados en este chat.' }, { quoted: m });
         }
 
-        const top = [];
+        const ranking = [];
 
-        // Contar personajes por usuario
+        // 3. Procesar datos de usuarios (basado en la estructura de tu claim.js)
         for (const jid in chat.users) {
-            const userChars = chat.users[jid].characters || [];
-            if (userChars.length > 0) {
-                top.push({ jid, count: userChars.length });
+            const userData = chat.users[jid];
+            // Contamos los personajes en el array 'characters'
+            const count = (userData.characters && Array.isArray(userData.characters)) ? userData.characters.length : 0;
+            
+            if (count > 0) {
+                ranking.push({ jid, count });
             }
         }
 
-        // Ordenar de mayor a menor
-        top.sort((a, b) => b.count - a.count);
-        const finalTop = top.slice(0, 10);
+        // 4. Ordenar de mayor a menor
+        ranking.sort((a, b) => b.count - a.count);
+        const top10 = ranking.slice(0, 10);
         
-        if (finalTop.length === 0) {
-            return await client.sendMessage(m.chat, { text: '⟡ No hay personajes registrados.' }, { quoted: m });
+        if (top10.length === 0) {
+            return await client.sendMessage(m.chat, { text: '⟡ No hay personajes reclamados para mostrar.' }, { quoted: m });
         }
 
-        // Construir mensaje con etiquetas (tags)
+        // 5. Crear mensaje y lista de menciones
         let txt = '🏆 *Top más reclamados de waifus* 🏆\n\n';
         const mentions = [];
 
-        finalTop.forEach((u, i) => {
-            mentions.push(u.jid); 
-            // Esto crea el tag @ y muestra el número
-            txt += `${i + 1}. @${u.jid.split('@')[0]} ❯ *${u.count} personajes*\n`;
+        top10.forEach((u, i) => {
+            mentions.push(u.jid); // Añadir JID para mención oficial
+            // Usamos el JID para el tag, así evitamos buscar nombres que no existen
+            const tag = u.jid.split('@')[0];
+            txt += `${i + 1}. @${tag} ❯ *${u.count} personajes*\n`;
         });
 
-        // Enviar menciones
+        // 6. Enviar
         await client.sendMessage(m.chat, { 
             text: txt, 
             mentions: mentions 
