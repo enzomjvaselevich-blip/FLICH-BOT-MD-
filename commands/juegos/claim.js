@@ -13,31 +13,44 @@ export default {
   command: ['claim', 'c', 'reclamar'],
   category: 'juegos',
   run: async (sock, m, args, from, isOwner, { prefix }) => {
-    // Asegurar estructura
-    global.db.data.chats[from] = global.db.data.chats[from] || { users: {}, characters: {}, rolls: {} };
+    // 1. Verificación estricta de la base de datos
+    if (!global.db?.data?.chats) {
+        return await sock.sendMessage(from, { text: '❌ Error: La base de datos no está inicializada.' }, { quoted: m });
+    }
+
     const chat = global.db.data.chats[from];
+    if (!chat || !chat.rolls) {
+        return await sock.sendMessage(from, { text: '❌ No hay registros de ruletas en este chat.' }, { quoted: m });
+    }
 
-    // Obtener el ID del mensaje citado correctamente
-    const quoted = m.quoted ? m.quoted : m;
-    const quotedId = quoted.key ? quoted.key.id : null;
+    // 2. Obtener el ID del mensaje citado (la clave para encontrar el personaje)
+    const quotedId = m.quoted ? m.quoted.key.id : null;
 
-    console.log("ID citado intentando reclamar:", quotedId); // Para debug en consola
-
-    if (!quotedId || !chat.rolls || !chat.rolls[quotedId]) {
-      return await sock.sendMessage(from, { text: '⟡ No encontré registro de este personaje. Asegúrate de citar el mensaje original del bot.' }, { quoted: m });
+    if (!quotedId || !chat.rolls[quotedId]) {
+      return await sock.sendMessage(from, { text: '⟡ No encontré registro de este personaje. Asegúrate de CITAR el mensaje original del bot.' }, { quoted: m });
     }
 
     if (chat.rolls[quotedId].claimed) {
-      return await sock.sendMessage(from, { text: '⟡ Este personaje ya fue reclamado.' }, { quoted: m });
+      return await sock.sendMessage(from, { text: '⟡ Este personaje ya fue reclamado anteriormente.' }, { quoted: m });
     }
 
+    // 3. Obtener datos
     const characterId = chat.rolls[quotedId].id;
     const structure = await loadCharacters();
     
     let characterName = "Desconocido";
-    // ... (tu lógica de búsqueda de nombre se mantiene igual) ...
+    // Nota: Ajusta esto si tu characters.json tiene otra estructura
+    for (const key in structure) {
+        if (structure[key].id == characterId) {
+            characterName = structure[key].name;
+            break;
+        }
+    }
 
-    chat.rolls[quotedId].claimed = true; // Marcar como reclamado
+    // 4. Registrar reclamo
+    chat.characters = chat.characters || {};
+    chat.characters[characterId] = { user: m.sender, name: characterName };
+    chat.rolls[quotedId].claimed = true;
 
     await sock.sendMessage(from, { 
         text: `⟡ ¡Felicidades! Has reclamado a *${characterName}* correctamente.`, 
