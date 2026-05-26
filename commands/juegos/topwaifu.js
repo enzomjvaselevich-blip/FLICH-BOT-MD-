@@ -1,40 +1,84 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
-module.exports = {
-  command: ['topwaifu', 'top'],
-  category: 'juegos',
-  run: async (client, m, args, usedPrefix, command) => {
-    try {
-      const dir = path.join(process.cwd(), 'waifus_guardados');
-      
-      // 1. Leer los archivos de la carpeta
-      if (!fs.existsSync(dir)) return await client.sendMessage(m.chat, { text: '⟡ Vacío.' });
+const USERS_FILE_PATH = './core/users.json';
 
-      const files = fs.readdirSync(dir);
-      const ranking = files.map(file => {
+export default {
+    command: ['topreclamos', 'toppersonajes', 'topwaifus'],
+    category: 'gacha',
+    run: async (ctx) => {
+        const { sock, from } = ctx;
+        const m = ctx.m || ctx.msg;
+
         try {
-          const content = fs.readFileSync(path.join(dir, file), 'utf8');
-          const data = JSON.parse(content);
-          return { number: file.replace('.json', ''), count: data.waifus?.length || 0 };
-        } catch { return null; }
-      }).filter(Boolean).sort((a, b) => b.count - a.count).slice(0, 10);
+            // 1. Verificar si el archivo existe, si no, crearlo automáticamente
+            let usersData = {};
+            try {
+                const raw = await fs.readFile(USERS_FILE_PATH, 'utf-8');
+                usersData = JSON.parse(raw);
+            } catch (e) {
+                if (e.code === 'ENOENT') {
+                    // Crear la carpeta core si no existe y luego el archivo vacío
+                    await fs.mkdir(path.dirname(USERS_FILE_PATH), { recursive: true });
+                    await fs.writeFile(USERS_FILE_PATH, JSON.stringify({}, null, 2), 'utf-8');
+                    usersData = {};
+                } else {
+                    console.error("Error cargando base de datos de usuarios:", e);
+                    return await sock.sendMessage(from, { text: "No pude acceder a los registros de reclamos." }, { quoted: m });
+                }
+            }
 
-      // 2. Formatear texto plano (evita problemas de procesado)
-      let txt = '🏆 *Top 10 Waifus (Registro Físico)* 🏆\n\n';
-      ranking.forEach((u, i) => {
-        txt += `${i + 1}. wa.me/${u.number} ❯ *${u.count} personajes*\n`;
-      });
+            // 2. Obtener los metadatos del grupo para saber quiénes están presentes
+            const groupMetadata = await sock.groupMetadata(from).catch(() => null);
+            if (!groupMetadata) {
+                return await sock.sendMessage(from, { text: "Este comando solo funciona en grupos." }, { quoted: m });
+            }
 
-      // 3. ENVIAR USANDO 'relayMessage' (BYPASS TOTAL)
-      // client.sendMessage usa muchas validaciones que causan el crash.
-      // relayMessage es más directo y evita el error de 'jidDecode'.
-      await client.relayMessage(m.chat, { extendedTextMessage: { text: txt } }, {});
+            const participants = groupMetadata.participants.map(p => p.id);
 
-    } catch (e) {
-      console.error("Error capturado en topwaifu:", e);
-      // Fallback final: si relayMessage falla, intentamos una última vez
-      await client.sendMessage(m.chat, { text: 'Error al generar ranking.' });
+            // 3. Filtrar y contar los personajes de la gente del grupo actual
+            let leaderboard = [];
+            
+            for (const jid of participants) {
+                if (usersData[jid]) {
+                    // Se verifica el array de personajes de cada usuario
+                    const cantidad = usersData[jid].personajes ? usersData[jid].personajes.length : 0; 
+                    if (cantidad > 0) {
+                        leaderboard.push({ jid, cantidad });
+                    }
+                }
+            }
+
+            if (leaderboard.length === 0) {
+                return await sock.sendMessage(from, { text: "Nadie en este grupo ha reclamado personajes aún." }, { quoted: m });
+            }
+
+            // 4. Ordenar el top de mayor a menor
+            leaderboard.sort((a, b) => b.cantidad - a.cantidad);
+            
+            // Tomar el Top 10
+            const top10 = leaderboard.slice(0, 10);
+
+            // 5. Construir el mensaje con el diseño del sistema
+            let textoTop = `⋆˚࿔ *TOP RECLAMOS* 𐙚˚⋆\n\n`;
+            
+            for (let i = 0; i < top10.length; i++) {
+                const user = top10[i];
+                const medalla = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `⟡`;
+                
+                textoTop += `${medalla} @${user.jid.split('@')[0]} \n`;
+                textoTop += `  ↳ 𝙴𝚜𝚌𝚛𝚒𝚋𝚎: ${user.cantidad} personajes\n\n`; 
+            }
+
+            // 6. Enviar mensaje etiquetando a los usuarios correspondientes
+            await sock.sendMessage(from, { 
+                text: textoTop.trim(), 
+                mentions: top10.map(u => u.jid) 
+            }, { quoted: m });
+
+        } catch (e) {
+            console.error("Error crítico en el top de personajes:", e);
+            await sock.sendMessage(from, { text: "Ocurrió un error al procesar el top." }, { quoted: m });
+        }
     }
-  }
 };
