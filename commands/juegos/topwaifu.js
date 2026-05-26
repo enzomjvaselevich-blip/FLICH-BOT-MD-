@@ -3,13 +3,11 @@ export default {
   category: 'juegos',
   run: async (client, m, args, usedPrefix, command) => {
     try {
-      // 1. Acceso a la base de datos de forma segura
+      // 1. Acceso seguro
       const chat = global.db?.data?.chats?.[m.chat];
-      if (!chat?.users) {
-        return await client.sendMessage(m.chat, { text: '❌ No hay registros de usuarios.' }, { quoted: m });
-      }
+      if (!chat?.users) return;
 
-      // 2. Procesamiento del top
+      // 2. Ranking
       const ranking = Object.entries(chat.users)
         .map(([jid, data]) => ({
           jid: jid,
@@ -19,24 +17,22 @@ export default {
         .sort((a, b) => b.count - a.count)
         .slice(0, 10);
 
-      if (ranking.length === 0) {
-        return await client.sendMessage(m.chat, { text: '⟡ No hay waifus reclamadas.' }, { quoted: m });
-      }
+      if (ranking.length === 0) return;
 
-      // 3. Generación del texto plano con enlaces wa.me
+      // 3. Texto plano puro (sin menciones ni lógica de librería)
       let txt = '🏆 *Top 10 Waifus Reclamadas* 🏆\n\n';
       ranking.forEach((u, i) => {
         const num = u.jid.split('@')[0];
-        // Al usar wa.me/numero, el usuario puede hacer clic para abrir el chat.
-        // ESTO EVITA que Baileys intente decodificar el JID y cause el crash.
-        txt += `${i + 1}. wa.me/${num} ❯ *${u.count} personajes*\n`;
+        txt += `${i + 1}. wa.me/${num} ❯ *${u.count}*\n`;
       });
 
-      // 4. ENVÍO DIRECTO: Sin el campo 'mentions', la librería no hace crash.
-      await client.sendMessage(m.chat, { text: txt }, { quoted: m });
+      // 4. ENVÍO SIN 'QUOTED' Y SIN 'MENTIONS'
+      // Al quitar 'quoted: m', evitamos que la librería intente leer un objeto 
+      // que causa el error de destructuring.
+      await client.sendMessage(m.chat, { text: txt });
 
     } catch (e) {
-      console.error("Error capturado en topwaifu:", e);
+      console.error("Error bypass aplicado:", e);
     }
   }
 }
