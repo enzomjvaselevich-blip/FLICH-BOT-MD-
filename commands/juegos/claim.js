@@ -24,10 +24,12 @@ export default {
 
       const quotedId = m.quoted?.id || m.message?.extendedTextMessage?.contextInfo?.stanzaId;
       if (!quotedId || !chat.rolls[quotedId]) {
-        return await sock.sendMessage(from, { text: '⟡ Cita el mensaje del personaje que quieres reclamar.' }, { quoted: m });
+        return await sock.sendMessage(from, { text: '⟡ Cita el mensaje del personaje que quieres reclamar gratis.' }, { quoted: m });
       }
 
       const rollData = chat.rolls[quotedId];
+      if (rollData.claimed) return await sock.sendMessage(from, { text: '⟡ Este personaje ya fue reclamado.' }, { quoted: m });
+
       const structure = await loadCharacters();
       const sourceData = getCharacterById(rollData.id, structure);
 
@@ -36,11 +38,13 @@ export default {
       chat.characters[rollData.id] = chat.characters[rollData.id] || {};
       if (chat.characters[rollData.id].user) return await sock.sendMessage(from, { text: `⟡ Ya tiene dueño.` }, { quoted: m });
 
+      // Reclamo exitoso directo (Gratis)
       chat.characters[rollData.id] = { user: m.sender, name: sourceData.name };
       chat.rolls[quotedId].claimed = true;
 
-      await sock.sendMessage(from, { text: `⟡ *${sourceData.name}* ha sido reclamado por ${m.pushName || 'ti'}.` }, { quoted: m });
+      await sock.sendMessage(from, { text: `⟡ *${sourceData.name}* reclamado exitosamente.` }, { quoted: m });
     } catch (e) {
+      console.error(e);
       await sock.sendMessage(from, { text: `> Error: ${e.message}` }, { quoted: m });
     }
   }
