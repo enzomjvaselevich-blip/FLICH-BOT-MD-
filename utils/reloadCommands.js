@@ -21,9 +21,13 @@ function reloadCommands(dir = path.join(process.cwd(), 'commands')) {
 
       try {
         delete require.cache[require.resolve(fullPath)];
-        const cmd = require(fullPath);
+        const imported = require(fullPath);
         
-        // Verifica si el export tiene la estructura correcta
+        // CORRECCIÓN: Si el archivo usa 'export default', 
+        // la estructura está dentro de .default
+        const cmd = imported.default || imported;
+
+        // Verifica si tiene la propiedad 'command'
         if (!cmd || !cmd.command) {
           console.log(`[!] Saltando ${file.name}: no tiene propiedad 'command'`);
           continue;
