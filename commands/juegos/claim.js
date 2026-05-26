@@ -1,27 +1,46 @@
 export default {
   command: ['claim', 'c', 'reclamar'],
   category: 'juegos',
-  run: async (client, m, args, usedPrefix, command) => {
-    // 1. Validar base de datos
-    if (!global.db.data.chats[m.chat]) global.db.data.chats[m.chat] = { users: {}, rolls: {} };
-    const chat = global.db.data.chats[m.chat];
+  run: async (sock, m, args, from, isOwner, { prefix }) => {
+    // 1. Validar DB
+    if (!global.db?.data?.chats) return await sock.sendMessage(from, { text: '❌ Base de datos no inicializada.' }, { quoted: m });
 
-    // 2. Obtener el mensaje citado
-    const quotedId = m.quoted ? m.quoted.id : m.message?.extendedTextMessage?.contextInfo?.stanzaId;
-    if (!quotedId) return m.reply('⟡ Cita el mensaje del personaje para reclamarlo.');
+    global.db.data.chats[from] = global.db.data.chats[from] || { users: {}, characters: {}, rolls: {} };
+    const chat = global.db.data.chats[from];
 
-    // 3. Verificar si existe en la ruleta
-    if (!chat.rolls || !chat.rolls[quotedId]) return m.reply('⟡ No encontré registro de este personaje.');
-    if (chat.rolls[quotedId].claimed) return m.reply('⟡ Ya fue reclamado.');
+    // 2. Obtener el ID citado
+    const quoted = m.quoted ? m.quoted : (m.message?.extendedTextMessage?.contextInfo?.stanzaId ? { key: { id: m.message.extendedTextMessage.contextInfo.stanzaId } } : null);
+    if (!quoted) return await sock.sendMessage(from, { text: '⟡ Debes CITAR el mensaje del personaje.' }, { quoted: m });
 
-    // 4. Guardar personaje en la estructura del usuario (Compatible con robwaifu.js)
-    if (!chat.users[m.sender]) chat.users[m.sender] = { characters: [] };
-    
+    const quotedId = quoted.key.id;
+
+    if (!chat.rolls || !chat.rolls[quotedId]) {
+        return await sock.sendMessage(from, { text: '⟡ No encontré registro de este personaje.' }, { quoted: m });
+    }
+
+    if (chat.rolls[quotedId].claimed) {
+        return await sock.sendMessage(from, { text: '⟡ Ya fue reclamado.' }, { quoted: m });
+    }
+
+    // 3. Guardado en la estructura que usa robwaifu
     const charId = chat.rolls[quotedId].id;
-    chat.users[m.sender].characters.push(charId); // Aquí se guarda el personaje
     
+    // Asegurar usuario en DB
+    chat.users = chat.users || {};
+    chat.users[m.sender] = chat.users[m.sender] || { characters: [] };
+    
+    // Guardar ID en la lista del usuario
+    chat.users[m.sender].characters.push(charId);
+    
+    // Guardar info general del personaje si no existe
+    chat.characters = chat.characters || {};
+    if (!chat.characters[charId]) {
+        chat.characters[charId] = { name: chat.rolls[quotedId].name || "Desconocido" };
+    }
+
     chat.rolls[quotedId].claimed = true;
 
-    await m.reply('⟡ ¡Has reclamado al personaje correctamente!');
+    await sock.sendMessage(from, { react: { text: '✅', key: m.key } });
+    await sock.sendMessage(from, { text: `⟡ ¡Has reclamado al personaje correctamente!` }, { quoted: m });
   }
 }
