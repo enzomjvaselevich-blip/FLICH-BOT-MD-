@@ -29,35 +29,38 @@ export default {
             const query = (Array.isArray(selected.tags) ? selected.tags[0] : selected.tags).trim().toLowerCase().replace(/\s+/g, '_');
             
             const { data } = await axios.get(`https://safebooru.org/index.php?page=dapi&s=post&q=index&json=1&tags=${query}`, { timeout: 5000 });
-            if (!data || data.length === 0) return await sock.sendMessage(from, { text: "No encontré imágenes para este personaje." }, { quoted: m });
+            if (!data || data.length === 0) return await sock.sendMessage(from, { text: "No encontré imágenes." }, { quoted: m });
             
             const p = data[Math.floor(Math.random() * data.length)];
             const media = `https://safebooru.org/images/${p.directory}/${p.image}`;
 
             const imgRes = await axios.get(media, { responseType: 'arraybuffer' });
             
-            // Envío del mensaje
+            // Enviamos el mensaje y capturamos la referencia "sent"
             const sent = await sock.sendMessage(from, { 
                 image: Buffer.from(imgRes.data), 
                 caption: `⋆˚࿔ *${selected.name}* 𐙚˚⋆\nID: ${selected.id}` 
             }, { quoted: m });
 
-            // INICIALIZACIÓN SEGURA DE LA BASE DE DATOS
+            // --- REGISTRO DE LA BASE DE DATOS PARA EL CLAIM ---
+            // Aseguramos la existencia de la estructura
             if (!global.db) global.db = { data: { chats: {} } };
             if (!global.db.data) global.db.data = { chats: {} };
-            if (!global.db.data.chats) global.db.data.chats = {};
             
+            // Inicializamos el objeto del chat si no existe
             global.db.data.chats[from] = global.db.data.chats[from] || { users: {}, characters: {}, rolls: {} };
             
-            // Guardamos el ID del mensaje para que el comando claim pueda leerlo
+            // Guardamos el ID del mensaje (sent.key.id) asociado al ID del personaje
             global.db.data.chats[from].rolls[sent.key.id] = { 
                 id: selected.id, 
                 claimed: false 
             };
 
+            console.log(`Ruleta registrada: ${sent.key.id} -> ${selected.name}`);
+
         } catch (e) {
             console.error("Error en la ruleta:", e);
-            await sock.sendMessage(from, { text: "Error procesando la ruleta. Intenta de nuevo." }, { quoted: m });
+            await sock.sendMessage(from, { text: "Error procesando la ruleta." }, { quoted: m });
         }
     }
 };
