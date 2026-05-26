@@ -20,13 +20,11 @@ async function loadCharacters() {
 export default {
     command: ['rw', 'rollwaifu', 'ruleta'],
     category: 'gacha',
-    run: async (ctx) => {
-        const { sock, from } = ctx;
-        const m = ctx.m || ctx.msg;
-
+    // IMPORTANTE: Ajustamos los parámetros a (sock, m, args, from)
+    run: async (sock, m, args, from) => {
         try {
             const allCharacters = await loadCharacters();
-            if (allCharacters.length === 0) return await sock.sendMessage(from, { text: "No hay personajes cargados." }, { quoted: m });
+            if (allCharacters.length === 0) return await sock.sendMessage(from, { text: "No hay personajes." }, { quoted: m });
 
             const selected = allCharacters[Math.floor(Math.random() * allCharacters.length)];
             const query = (Array.isArray(selected.tags) ? selected.tags[0] : selected.tags).trim().toLowerCase().replace(/\s+/g, '_');
@@ -38,12 +36,11 @@ export default {
             const imgRes = await axios.get(media, { responseType: 'arraybuffer' });
             const sent = await sock.sendMessage(from, { 
                 image: Buffer.from(imgRes.data), 
-                caption: `⋆˚࿔ *${selected.name}* 𐙚˚⋆\n\n• Valor: ¥${selected.value || 100}\n• Género: ${selected.gender || 'Desconocido'}` 
+                caption: `⋆˚࿔ *${selected.name}* 𐙚˚⋆\n\n• Valor: ¥${selected.value || 100}` 
             }, { quoted: m });
 
-            // Protección de DB
-            if (global.db && global.db.data) {
-                global.db.data.chats = global.db.data.chats || {};
+            // Validación segura de global.db
+            if (global.db?.data?.chats) {
                 global.db.data.chats[from] = global.db.data.chats[from] || { rolls: {} };
                 global.db.data.chats[from].rolls[sent.key.id] = { id: selected.id, claimed: false };
             }
