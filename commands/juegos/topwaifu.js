@@ -3,26 +3,44 @@ export default {
     category: 'juegos',
     run: async (sock, m, args, from, isOwner, { prefix }) => {
         const chat = global.db?.data?.chats[from];
-        if (!chat || !chat.characters) {
-            return await sock.sendMessage(from, { text: '❌ No hay personajes reclamados.' }, { quoted: m });
+        
+        // Verificación de datos
+        if (!chat || !chat.characters || Object.keys(chat.characters).length === 0) {
+            return await sock.sendMessage(from, { text: '❌ No hay personajes reclamados todavía.' }, { quoted: m });
         }
 
         const userStats = {};
-        // Recorremos los personajes reclamados
+        // Contar personajes por usuario
         for (const key in chat.characters) {
             const userId = chat.characters[key].user;
-            userStats[userId] = (userStats[userId] || 0) + 1;
+            if (userId) {
+                userStats[userId] = (userStats[userId] || 0) + 1;
+            }
         }
 
+        // Ordenar de mayor a menor
         const top = Object.entries(userStats).sort((a, b) => b[1] - a[1]).slice(0, 10);
         
-        if (top.length === 0) return await sock.sendMessage(from, { text: '⟡ No hay personajes.' }, { quoted: m });
+        if (top.length === 0) return await sock.sendMessage(from, { text: '⟡ No hay datos para mostrar.' }, { quoted: m });
 
-        let txt = '🏆 *TOP 10 WAIFUS* 🏆\n\n';
+        // Texto solicitado
+        let txt = '🏆 *Top más reclamados de waifus* 🏆\n\n';
+        
+        // Lista de menciones para que los tags funcionen
+        const mentions = [];
+
         top.forEach((u, i) => {
-            txt += `${i + 1}. @${u[0].split('@')[0]} ❯ *${u[1]}*\n`;
+            const jid = u[0];
+            const count = u[1];
+            mentions.push(jid); // Agregamos al array de menciones
+            
+            // Usamos @nombre para la mención
+            txt += `${i + 1}. @${jid.split('@')[0]} ❯ *${count}*\n`;
         });
 
-        await sock.sendMessage(from, { text: txt, mentions: top.map(u => u[0]) }, { quoted: m });
+        await sock.sendMessage(from, { 
+            text: txt, 
+            mentions: mentions 
+        }, { quoted: m });
     }
 }
